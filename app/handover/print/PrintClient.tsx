@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
 
@@ -10,6 +10,7 @@ export default function PrintClient({ id }: Props) {
   const [optimizedPhotos, setOptimizedPhotos] = useState<string[] | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [shouldOpenPdf, setShouldOpenPdf] = useState(false);
+  const [shouldAutoPrint, setShouldAutoPrint] = useState(false);
 
   // Load report: prefer sessionStorage, fallback to API
   useEffect(() => {
@@ -69,7 +70,7 @@ export default function PrintClient({ id }: Props) {
     return !!x && typeof (x as { output?: unknown }).output === "function";
   }
 
-  async function downloadPdf() {
+  const downloadPdf = useCallback(async () => {
     try {
       const mod: unknown = await import("html2pdf.js");
       const possible = mod as Html2PdfFactory | { default?: unknown };
@@ -123,27 +124,24 @@ export default function PrintClient({ id }: Props) {
     } finally {
       contentRef.current?.classList.remove("pdf-mode");
     }
-  }
+  }, [data]);
 
   // Detect mode from query param and trigger appropriate action
   useEffect(() => {
     const usp = new URLSearchParams(window.location.search);
     setShouldOpenPdf(usp.get("open") === "pdf");
-    // lang param no longer needed; we render bilingual output by default
+    setShouldAutoPrint(usp.get("auto") === "1" || usp.get("auto") === "true");
   }, []);
 
   // Auto-open print or PDF depending on mode
   useEffect(() => {
-    if (!data) return;
+    if (!data || !shouldAutoPrint) return;
     const t = setTimeout(() => {
-      if (shouldOpenPdf) {
-        void downloadPdf();
-      } else {
-        window.print();
-      }
-    }, 150);
+      if (shouldOpenPdf) void downloadPdf();
+      else window.print();
+    }, 200); // small delay so buttons are focusable briefly
     return () => clearTimeout(t);
-  }, [data, shouldOpenPdf, downloadPdf]);
+  }, [data, shouldAutoPrint, shouldOpenPdf, downloadPdf]);
 
   if (!data)
     return (
@@ -170,46 +168,68 @@ export default function PrintClient({ id }: Props) {
           <button
             onClick={() => window.print()}
             className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
+            type="button"
           >
             Print
           </button>
           <button
             onClick={() => void downloadPdf()}
             className="text-sm rounded-full bg-accent text-accent-foreground px-3 py-1 hover:opacity-95"
+            type="button"
           >
             Download PDF
           </button>
         </div>
       </div>
-      <div ref={contentRef} dangerouslySetInnerHTML={{ __html: html }} />
+      <div
+        ref={contentRef}
+        className="print-light"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
     </main>
   );
 }
 
 const styles = `
   @page { size: A4; margin: 10mm; }
-  body{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#111; line-height:1.3; }
-  h1{ font-size: 18px; margin: 0 0 6px; }
-  .header{ margin-bottom:8px }
-  .header .company{ font-weight:700 }
-  .row{ margin: 3px 0 }
-  .label{ display:inline-block; width: 120px; color:#555 }
-  .box{ border:1px solid #ddd; border-radius:8px; padding:8px; margin-top:8px }
-  .muted{ color:#666 }
-  .grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:6px }
-  img{ width:100%; height:120px; object-fit:cover; border-radius:6px; border:1px solid #eee }
-  /* Force 12px font size in generated PDFs */
-  .pdf-mode, .pdf-mode * { font-size: 12px !important; }
-  /* Ensure absolutely everything prints at 12px (override inline font sizes) */
-  @media print { body, body * { font-size:12px !important; } }
+  /* Light theme base */
+  body, .print-light { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#fff; color:#111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-light { line-height:1.45; }
+  h1{ font-size:20px; margin:0 0 10px; font-weight:700; letter-spacing:.5px; }
+  h2{ font-size:14px; margin:10px 0 6px; font-weight:600; }
+  .header{ margin-bottom:10px; padding:6px 8px; background:#f7f7f9; border:1px solid #e2e2e6; border-radius:6px; }
+  .header .company{ font-weight:700; font-size:13px; }
+  .row{ margin:4px 0; font-size:12px; }
+  .label{ display:inline-block; min-width:120px; color:#333; font-weight:500; }
+  .box{ border:1px solid #e2e2e6; background:#fcfcfd; border-radius:10px; padding:10px 12px; margin-top:12px; box-shadow:0 0 0 1px #fff inset; }
+  .box p{ margin:6px 0; }
+  .box p + p{ margin-top:8px; }
+  .muted{ color:#555; }
+  .divider{ height:1px; background:linear-gradient(90deg,#e5e5e9,#f7f7f9 40%,#e5e5e9); margin:14px 0; }
+  .grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:8px }
+  img{ width:100%; height:120px; object-fit:cover; border-radius:8px; border:1px solid #ddd; background:#fafafa; }
+  .photos-heading{ font-size:12px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; margin-bottom:4px; color:#222; }
+  /* Force 12px body text but allow larger headings to remain readable */
+  .pdf-mode, .pdf-mode * { font-size:12px !important; }
+  .pdf-mode h1, .pdf-mode h2 { font-size: inherit !important; } /* Will reset below */
+  @media print { body, body :not(h1):not(h2):not(h3) { font-size:12px !important; } }
+  /* Reapply heading sizes after global 12px clamp */
+  @media print { h1{ font-size:20px !important; } h2{ font-size:14px !important; } }
+  .pdf-mode h1{ font-size:20px !important; } .pdf-mode h2{ font-size:14px !important; }
+  /* Improve paragraph readability */
+  .print-light p{ line-height:1.5; }
+  /* Bilingual separation */
+  .box h2 + p{ margin-top:4px; }
   /* Images and grid for print */
   @media print {
     .grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
-    img{ height: 160px; }
+    img{ height:170px; }
+    /* Hide any global navigation / headers when printing this page */
+    nav, header { display:none !important; }
   }
   /* Images and grid for generated PDF */
   .pdf-mode .grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .pdf-mode img{ height: 160px; }
+  .pdf-mode img{ height:170px; }
 `;
 
 function esc(s: string) {

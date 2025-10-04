@@ -55,16 +55,15 @@ export default function HandoverClient() {
         stream.getTracks().forEach((t) => t.stop());
         setStream(null);
       }
-      const constraints: MediaStreamConstraints = {
-        video: selectedDeviceId
-          ? { deviceId: { exact: selectedDeviceId } }
-          : {
-              facingMode: { ideal: "environment" },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-        audio: false,
-      };
+      const baseVideo: MediaTrackConstraints = selectedDeviceId
+        ? { deviceId: { exact: selectedDeviceId } }
+        : {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            aspectRatio: { ideal: 16 / 9 },
+          };
+      const constraints: MediaStreamConstraints = { video: baseVideo, audio: false };
       const s = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(s);
       if (videoRef.current) {
@@ -174,7 +173,12 @@ export default function HandoverClient() {
       .catch(() => {});
     const handler = () => void refreshDevices();
     navigator.mediaDevices?.addEventListener?.("devicechange", handler);
+    // Auto-start camera after initial device enumeration (delay for permission prompt order)
+    const autoTimer = setTimeout(() => {
+      if (!cameraOpen) void startCamera();
+    }, 250);
     return () => {
+      clearTimeout(autoTimer);
       navigator.mediaDevices?.removeEventListener?.("devicechange", handler);
     };
   }, []);
@@ -443,14 +447,26 @@ export default function HandoverClient() {
                     onClick={() => {
                       if (!videoRef.current || !canvasRef.current) return;
                       const v = videoRef.current;
+                      const rawW = v.videoWidth || 1280;
+                      const rawH = v.videoHeight || 720;
+                      const landscape = rawW >= rawH;
                       const c = canvasRef.current;
-                      const w = v.videoWidth || 1280;
-                      const h = v.videoHeight || 720;
-                      c.width = w;
-                      c.height = h;
                       const ctx = c.getContext("2d");
                       if (!ctx) return;
-                      ctx.drawImage(v, 0, 0, w, h);
+                      if (landscape) {
+                        c.width = rawW;
+                        c.height = rawH;
+                        ctx.drawImage(v, 0, 0, rawW, rawH);
+                      } else {
+                        // Rotate portrait to landscape (clockwise 90deg)
+                        c.width = rawH;
+                        c.height = rawW;
+                        ctx.save();
+                        ctx.translate(c.width / 2, c.height / 2);
+                        ctx.rotate(90 * Math.PI / 180);
+                        ctx.drawImage(v, -rawW / 2, -rawH / 2, rawW, rawH);
+                        ctx.restore();
+                      }
                       const dataUrl = c.toDataURL("image/jpeg", 0.9);
                       setPhotos((arr) => [...arr, dataUrl]);
                     }}
