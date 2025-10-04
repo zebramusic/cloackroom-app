@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
 
 type Props = { id: string };
@@ -158,19 +159,27 @@ export default function PrintClient({ id }: Props) {
             "\n@media print{ .print\\:hidden{ display:none !important } }",
         }}
       />
-      <div className="flex items-center justify-end gap-2 print:hidden">
-        <button
-          onClick={() => window.print()}
+      <div className="flex items-center justify-between gap-4 print:hidden mb-4">
+        <Link
+          href="/handover"
           className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
         >
-          Print
-        </button>
-        <button
-          onClick={() => void downloadPdf()}
-          className="text-sm rounded-full bg-accent text-accent-foreground px-3 py-1 hover:opacity-95"
-        >
-          Download PDF
-        </button>
+          ← Back to Handover
+        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.print()}
+            className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
+          >
+            Print
+          </button>
+          <button
+            onClick={() => void downloadPdf()}
+            className="text-sm rounded-full bg-accent text-accent-foreground px-3 py-1 hover:opacity-95"
+          >
+            Download PDF
+          </button>
+        </div>
       </div>
       <div ref={contentRef} dangerouslySetInnerHTML={{ __html: html }} />
     </main>
@@ -191,8 +200,8 @@ const styles = `
   img{ width:100%; height:120px; object-fit:cover; border-radius:6px; border:1px solid #eee }
   /* Force 12px font size in generated PDFs */
   .pdf-mode, .pdf-mode * { font-size: 12px !important; }
-  /* Ensure 12px in native print as well */
-  @media print { body{ font-size:12px; } }
+  /* Ensure absolutely everything prints at 12px (override inline font sizes) */
+  @media print { body, body * { font-size:12px !important; } }
   /* Images and grid for print */
   @media print {
     .grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }

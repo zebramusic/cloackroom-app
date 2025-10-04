@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, getSessionUser, SESS_COOKIE } from "@/lib/auth";
 import type { StaffUser } from "@/app/models/staff";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me || me.type !== "admin")
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const db = await getDb();
   if (!db) return NextResponse.json({ items: [] });
   const items = await db
@@ -16,6 +20,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me || me.type !== "admin")
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = (await req.json()) as Partial<StaffUser> & { password?: string };
   if (!body.fullName || !body.email || !body.password)
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -35,6 +43,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me || me.type !== "admin")
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = (await req.json()) as Partial<StaffUser> & { id?: string; password?: string; isAuthorized?: boolean };
   if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const db = await getDb();
@@ -52,6 +64,10 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me || me.type !== "admin")
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });

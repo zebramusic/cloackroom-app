@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { SESS_COOKIE, hashPassword, generateToken } from "@/lib/auth"; // removed unused HOUR
+import { SESS_COOKIE, hashPassword, generateToken, verifyPassword, needsRehash } from "@/lib/auth"; // upgraded hashing
 import type { StaffUser, Session } from "@/app/models/staff";
 import type { AdminUser } from "@/app/models/admin";
 
@@ -31,9 +31,15 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: type === "admin" ? "Admin email not found" : "Staff email not found" }, { status: 401 });
   }
-  const hash = await hashPassword(body.password);
   const passwordHash = (user as CombinedUser).passwordHash;
-  if (hash !== passwordHash) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  const ok = await verifyPassword(body.password, passwordHash);
+  if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  // Opportunistic upgrade of legacy hashes
+  if (needsRehash(passwordHash)) {
+    const newHash = await hashPassword(body.password);
+    const coll = type === "admin" ? db.collection<AdminUser>("admins") : db.collection<StaffUser>("staff");
+    await coll.updateOne({ id: user.id }, { $set: { passwordHash: newHash } });
+  }
   const token = generateToken(user.id);
   const ttl = body.remember ? 14 * 24 * 60 * 60 : 8 * 60 * 60; // seconds
   const sess: Session = {
