@@ -3,6 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Extended theme tokens */
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --muted: #f4f4f5; /* zinc-100 */
+  --muted-foreground: #52525b; /* zinc-600 */
+  --border: #e4e4e7; /* zinc-200 */
+  --accent: #7c3aed; /* violet-600 */
+  --accent-foreground: #fafafa; /* neutral-50 */
 }
 
 @theme inline {
@@ -10,12 +18,26 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --card: #0f0f10;
+    --card-foreground: #e5e7eb;
+    --muted: #111113; /* near zinc-950 */
+    --muted-foreground: #a1a1aa; /* zinc-400 */
+    --border: #27272a; /* zinc-800 */
+    --accent: #8b5cf6; /* violet-500 */
+    --accent-foreground: #0a0a0a;
   }
 }
 

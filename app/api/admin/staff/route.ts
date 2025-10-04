@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/lib/mongodb";
+import { hashPassword } from "@/lib/auth";
+import type { StaffUser } from "@/app/models/staff";
+
+export async function GET() {
+  const db = await getDb();
+  if (!db) return NextResponse.json({ items: [] });
+  const items = await db
+    .collection<StaffUser>("staff")
+    .find({})
+    .sort({ createdAt: -1 })
+    .limit(200)
+    .toArray();
+  return NextResponse.json({ items });
+}
+
+export async function POST(req: NextRequest) {
+  const body = (await req.json()) as Partial<StaffUser> & { password?: string };
+  if (!body.fullName || !body.email || !body.password)
+    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  const db = await getDb();
+  if (!db) return NextResponse.json({ error: "DB not configured" }, { status: 500 });
+  const user: StaffUser = {
+    id: `staff_${Date.now()}`,
+    fullName: body.fullName,
+    email: String(body.email).toLowerCase(),
+    passwordHash: await hashPassword(body.password),
+    createdAt: Date.now(),
+  };
+  await db.collection<StaffUser>("staff").updateOne({ id: user.id }, { $set: user }, { upsert: true });
+  return NextResponse.json(user, { status: 201 });
+}
+
+export async function PATCH(req: NextRequest) {
+  const body = (await req.json()) as Partial<StaffUser> & { id?: string; password?: string };
+  if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const db = await getDb();
+  if (!db) return NextResponse.json({ error: "DB not configured" }, { status: 500 });
+  const update: Partial<StaffUser> = {};
+  if (body.fullName) update.fullName = body.fullName;
+  if (body.email) update.email = body.email.toLowerCase();
+  if (body.password) update.passwordHash = await hashPassword(body.password);
+  await db.collection<StaffUser>("staff").updateOne({ id: body.id }, { $set: update });
+  const updated = await db.collection<StaffUser>("staff").findOne({ id: body.id });
+  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const db = await getDb();
+  if (!db) return NextResponse.json({ error: "DB not configured" }, { status: 500 });
+  await db.collection<StaffUser>("staff").deleteOne({ id });
+  return NextResponse.json({ ok: true });
+}
