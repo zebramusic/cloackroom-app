@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
@@ -109,15 +110,15 @@ export default function AdminLoginPage() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
         <div className="flex items-center justify-between text-sm">
-          <a
+          <Link
             href="/admin/reset/request"
             className="underline underline-offset-2"
           >
             Forgot password?
-          </a>
-          <a href="/admin/staff" className="underline underline-offset-2">
+          </Link>
+          <Link href="/admin/staff" className="underline underline-offset-2">
             Manage staff
-          </a>
+          </Link>
         </div>
       </form>
     </main>
