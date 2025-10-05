@@ -41,7 +41,8 @@ export default function AdminLoginPage() {
         setError("Session not established. Please retry.");
         return;
       }
-      const dest = me.user.type === "admin" ? "/private/admin" : "/private/handover";
+      const dest =
+        me.user.type === "admin" ? "/private/admin" : "/private/handover";
       router.replace(dest);
     } finally {
       setLoading(false);
