@@ -45,7 +45,11 @@ export default function AdminLoginPage() {
       >
         <fieldset>
           <legend className="block text-sm font-medium mb-1">Login as</legend>
-          <div className="flex gap-4 text-sm" role="radiogroup" aria-label="Login type">
+          <div
+            className="flex gap-4 text-sm"
+            role="radiogroup"
+            aria-label="Login type"
+          >
             <label className="inline-flex items-center gap-1">
               <input
                 type="radio"
@@ -69,7 +73,9 @@ export default function AdminLoginPage() {
           </div>
         </fieldset>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium">Email</label>
+          <label htmlFor="email" className="block text-sm font-medium">
+            Email
+          </label>
           <input
             id="email"
             value={email}
@@ -81,7 +87,9 @@ export default function AdminLoginPage() {
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium">Password</label>
+          <label htmlFor="password" className="block text-sm font-medium">
+            Password
+          </label>
           <div className="relative mt-1">
             <input
               id="password"
@@ -111,7 +119,11 @@ export default function AdminLoginPage() {
           />{" "}
           Remember me (two weeks)
         </label>
-  {error ? <div id="form-error" className="text-sm text-red-600" role="alert">{error}</div> : null}
+        {error ? (
+          <div id="form-error" className="text-sm text-red-600" role="alert">
+            {error}
+          </div>
+        ) : null}
         <button
           disabled={loading}
           className="w-full rounded-full bg-accent text-accent-foreground px-5 py-2.5 text-sm font-medium shadow"

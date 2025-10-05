@@ -10,6 +10,8 @@ export async function POST(req: NextRequest) {
     if (db) await db.collection("sessions").deleteOne({ token });
   }
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESS_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  const secure = process.env.NODE_ENV === "production";
+  res.cookies.set(SESS_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0, secure, sameSite: "lax" });
+  res.cookies.set("cloack_role", "", { httpOnly: false, path: "/", maxAge: 0, secure, sameSite: "lax" });
   return res;
 }

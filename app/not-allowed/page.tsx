@@ -9,8 +9,8 @@ export default function NotAllowedPage() {
       <div className="w-full max-w-xl">
         <h1 className="text-3xl font-bold">Access restricted</h1>
         <p className="mt-4 text-sm text-muted-foreground">
-          Your current role does not have permission to view this page. Choose an
-          option below.
+          Your current role does not have permission to view this page. Choose
+          an option below.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <a

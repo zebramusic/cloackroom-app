@@ -8,4 +8,5 @@ export interface HandoverReport {
   notes?: string;
   photos?: string[]; // data URLs captured or uploaded
   createdAt: number; // epoch ms
+  language?: 'ro' | 'en'; // chosen language for print (single-language mode)
 }

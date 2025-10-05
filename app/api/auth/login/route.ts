@@ -51,8 +51,10 @@ export async function POST(req: NextRequest) {
   };
   await db.collection<Session>("sessions").updateOne({ token }, { $set: sess }, { upsert: true });
   const res = NextResponse.json({ id: (user as CombinedUser).id, fullName: (user as CombinedUser).fullName, email: (user as CombinedUser).email, type });
-  res.cookies.set(SESS_COOKIE, token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: ttl });
-  // Non-httpOnly role hint cookie so edge middleware can read without DB access (defense-in-depth still handled server-side)
-  res.cookies.set("cloack_role", type, { httpOnly: false, sameSite: "lax", path: "/", maxAge: ttl });
+  const secure = process.env.NODE_ENV === "production";
+  const baseCookie = { sameSite: "lax" as const, path: "/", maxAge: ttl, secure };
+  res.cookies.set(SESS_COOKIE, token, { ...baseCookie, httpOnly: true });
+  // Non-httpOnly role hint cookie so edge middleware can read without DB access
+  res.cookies.set("cloack_role", type, { ...baseCookie, httpOnly: false });
   return res;
 }

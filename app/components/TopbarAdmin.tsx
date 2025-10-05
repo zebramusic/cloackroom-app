@@ -29,7 +29,8 @@ export default function TopbarAdmin() {
     await fetch("/api/auth/logout", { method: "POST" });
     location.href = "/admin/login";
   }
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const pathname =
+    typeof window !== "undefined" ? window.location.pathname : "";
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 h-12 flex items-center justify-between">
@@ -53,14 +54,18 @@ export default function TopbarAdmin() {
               <Link
                 href="/admin/staff"
                 className="text-sm hover:underline"
-                aria-current={pathname.startsWith("/admin/staff") ? "page" : undefined}
+                aria-current={
+                  pathname.startsWith("/admin/staff") ? "page" : undefined
+                }
               >
                 Staff
               </Link>
               <Link
                 href="/admin/admins"
                 className="text-sm hover:underline"
-                aria-current={pathname.startsWith("/admin/admins") ? "page" : undefined}
+                aria-current={
+                  pathname.startsWith("/admin/admins") ? "page" : undefined
+                }
               >
                 Admins
               </Link>
