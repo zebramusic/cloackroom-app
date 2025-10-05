@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LocaleProvider from "@/app/providers/LocaleProvider";
+import { ToastProvider } from "@/app/private/toast/ToastContext";
+import ToastViewport from "@/app/private/toast/ToastViewport";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,10 +27,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <LocaleProvider>{children}</LocaleProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ToastProvider>
+          <LocaleProvider>{children}</LocaleProvider>
+          <ToastViewport />
+        </ToastProvider>
       </body>
     </html>
   );
