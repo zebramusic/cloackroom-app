@@ -23,12 +23,26 @@ export default function AdminLoginPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password, remember, type }),
       });
+      const payload = await res
+        .json()
+        .catch(() => ({ error: "Login failed (invalid response)" }));
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setError(j.error || "Login failed");
+        setError(payload.error || "Login failed");
         return;
       }
-      router.push("/private/handover");
+      // Mitigate race where navigation to /private happens before the browser
+      // persists Set-Cookie from the fetch response (esp. on some mobile browsers)
+      await new Promise((r) => setTimeout(r, 60));
+      // Verify session actually readable (cookie present)
+      const me = await fetch("/api/auth/me", { cache: "no-store" })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!me?.user) {
+        setError("Session not established. Please retry.");
+        return;
+      }
+      const dest = me.user.type === "admin" ? "/private/admin" : "/private/handover";
+      router.replace(dest);
     } finally {
       setLoading(false);
     }
