@@ -3,7 +3,11 @@ import PrivateNav from "@/app/private/PrivateNav";
 import { ToastProvider } from "@/app/private/toast/ToastContext";
 import ToastViewport from "@/app/private/toast/ToastViewport";
 
-export default function PrivateRootLayout({ children }: { children: ReactNode }) {
+export default function PrivateRootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <ToastProvider>
       <PrivateNav />

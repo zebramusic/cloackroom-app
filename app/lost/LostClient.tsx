@@ -119,7 +119,7 @@ export default function LostClient() {
       setEmail("");
       setPhotos([]);
       await fetchClaims("");
-  push({ message: t("lost.submitted"), variant: "success" });
+      push({ message: t("lost.submitted"), variant: "success" });
     } finally {
       setSubmitting(false);
     }

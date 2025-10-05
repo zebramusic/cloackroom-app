@@ -1,9 +1,11 @@
 "use client";
 import { useToast } from "./ToastContext";
+import type { Toast } from "./ToastContext";
 import { useState, useEffect } from "react";
 
 function Icon({ variant }: { variant?: string }) {
-  const base = "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold";
+  const base =
+    "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold";
   switch (variant) {
     case "success":
       return <span className={`${base} bg-green-600 text-white`}>✓</span>;
@@ -12,7 +14,9 @@ function Icon({ variant }: { variant?: string }) {
     case "warning":
       return <span className={`${base} bg-amber-500 text-white`}>!</span>;
     default:
-      return <span className={`${base} bg-accent text-accent-foreground`}>i</span>;
+      return (
+        <span className={`${base} bg-accent text-accent-foreground`}>i</span>
+      );
   }
 }
 
@@ -27,7 +31,7 @@ export default function ToastViewport() {
   );
 }
 
-function ToastItem({ t, onClose }: { t: any; onClose: () => void }) {
+function ToastItem({ t, onClose }: { t: Toast; onClose: () => void }) {
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     if (leaving) {

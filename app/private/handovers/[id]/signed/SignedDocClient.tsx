@@ -3,7 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/app/private/toast/ToastContext";
 import { useRouter } from "next/navigation";
 
-export default function SignedDocClient({ initial, id }: { initial?: string; id: string }) {
+export default function SignedDocClient({
+  initial,
+  id,
+}: {
+  initial?: string;
+  id: string;
+}) {
   const [value, setValue] = useState<string | undefined>(initial);
   const [uploading, setUploading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -200,7 +206,9 @@ export default function SignedDocClient({ initial, id }: { initial?: string; id:
             autoPlay
           />
           {cameraError ? (
-            <p className="text-xs text-red-600" aria-live="polite">{cameraError}</p>
+            <p className="text-xs text-red-600" aria-live="polite">
+              {cameraError}
+            </p>
           ) : null}
           <div className="flex gap-2 flex-wrap">
             <button
@@ -228,7 +236,11 @@ export default function SignedDocClient({ initial, id }: { initial?: string; id:
   );
 }
 
-function fileToJpegDataUrl(file: File, maxW: number, quality: number): Promise<string> {
+function fileToJpegDataUrl(
+  file: File,
+  maxW: number,
+  quality: number
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -250,7 +262,7 @@ function fileToJpegDataUrl(file: File, maxW: number, quality: number): Promise<s
             resolve(reader.result as string);
             return;
           }
-            ctx.drawImage(img, 0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
           const out = canvas.toDataURL("image/jpeg", quality);
           resolve(out);
         } catch (e) {
@@ -265,7 +277,10 @@ function fileToJpegDataUrl(file: File, maxW: number, quality: number): Promise<s
   });
 }
 
-async function compressCanvasToMax(canvas: HTMLCanvasElement, maxBytes: number): Promise<string> {
+async function compressCanvasToMax(
+  canvas: HTMLCanvasElement,
+  maxBytes: number
+): Promise<string> {
   let quality = 0.9;
   let attempt = 0;
   let currentCanvas = canvas;
@@ -296,10 +311,15 @@ async function compressCanvasToMax(canvas: HTMLCanvasElement, maxBytes: number):
 function estimateDataUrlBytes(dataUrl: string): number {
   const b64 = dataUrl.split(",")[1] || "";
   // Base64 size formula: (length * 3)/4 - padding
-  return Math.round((b64.length * 3) / 4 - (b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0));
+  return Math.round(
+    (b64.length * 3) / 4 - (b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0)
+  );
 }
 
-async function ensureMaxBytes(dataUrl: string, maxBytes: number): Promise<string> {
+async function ensureMaxBytes(
+  dataUrl: string,
+  maxBytes: number
+): Promise<string> {
   if (estimateDataUrlBytes(dataUrl) <= maxBytes) return dataUrl;
   // load into canvas and compress
   const img = document.createElement("img");

@@ -297,7 +297,11 @@ export default function HandoverClient() {
     await fetchList(q);
   }
 
-  function fileToJpegDataUrl(file: File, maxW: number, quality: number): Promise<string> {
+  function fileToJpegDataUrl(
+    file: File,
+    maxW: number,
+    quality: number
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -305,7 +309,7 @@ export default function HandoverClient() {
           reject(new Error("Bad file result"));
           return;
         }
-  const img = document.createElement("img");
+        const img = document.createElement("img");
         img.onload = () => {
           try {
             const scale = Math.min(1, maxW / img.width);
