@@ -13,7 +13,7 @@ export default function PrintClient({ id }: Props) {
   const [shouldAutoPrint, setShouldAutoPrint] = useState(false);
   const [forceLandscape, setForceLandscape] = useState(false); // can be enabled via ?orientation=landscape
   const [maxDim, setMaxDim] = useState(1600); // adjustable via ?quality=low|high
-  const [lang, setLang] = useState<'ro' | 'en'>('ro');
+  const [lang, setLang] = useState<"ro" | "en">("ro");
   const userChangedLang = useRef(false);
 
   // Load report: prefer sessionStorage, fallback to API
@@ -59,7 +59,10 @@ export default function PrintClient({ id }: Props) {
     };
   }, [data?.photos, data?.createdAt, forceLandscape, maxDim]);
 
-  const html = useMemo(() => (data ? buildHTML(data, optimizedPhotos ?? undefined, lang) : ''), [data, optimizedPhotos, lang]);
+  const html = useMemo(
+    () => (data ? buildHTML(data, optimizedPhotos ?? undefined, lang) : ""),
+    [data, optimizedPhotos, lang]
+  );
 
   // PDF generator types and function (defined before any early return to keep hook order stable)
   type Html2Pdf = {
@@ -139,20 +142,21 @@ export default function PrintClient({ id }: Props) {
     const usp = new URLSearchParams(window.location.search);
     setShouldOpenPdf(usp.get("open") === "pdf");
     setShouldAutoPrint(usp.get("auto") === "1" || usp.get("auto") === "true");
-  const orient = usp.get("orientation");
-  if (orient === "landscape") setForceLandscape(true);
-  else if (orient === "original" || orient === "portrait") setForceLandscape(false);
+    const orient = usp.get("orientation");
+    if (orient === "landscape") setForceLandscape(true);
+    else if (orient === "original" || orient === "portrait")
+      setForceLandscape(false);
     const quality = usp.get("quality");
     if (quality === "high") setMaxDim(2400);
     else if (quality === "low") setMaxDim(1000);
-    const lp = usp.get('lang');
-    if (lp === 'en' || lp === 'ro') setLang(lp);
+    const lp = usp.get("lang");
+    if (lp === "en" || lp === "ro") setLang(lp);
   }, []);
 
   useEffect(() => {
     if (!data) return;
     const usp = new URLSearchParams(window.location.search);
-    if (!usp.get('lang') && !userChangedLang.current) {
+    if (!usp.get("lang") && !userChangedLang.current) {
       if (data.language) setLang(data.language);
     }
   }, [data]);
@@ -183,37 +187,60 @@ export default function PrintClient({ id }: Props) {
       />
       <div className="flex items-center justify-between gap-4 print:hidden mb-4">
         <Link
-          href="/handover"
+          href="/private/handover"
           className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
         >
           ← Back to Handover
         </Link>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 mr-2" aria-label="Language toggle">
+          <div
+            className="flex items-center gap-1 mr-2"
+            aria-label="Language toggle"
+          >
             <button
               type="button"
               onClick={() => {
-                if (lang === 'ro') return;
+                if (lang === "ro") return;
                 userChangedLang.current = true;
-                setLang('ro');
+                setLang("ro");
                 const usp = new URLSearchParams(window.location.search);
-                usp.set('lang','ro');
-                window.history.replaceState(null,'',`${window.location.pathname}?${usp.toString()}`);
+                usp.set("lang", "ro");
+                window.history.replaceState(
+                  null,
+                  "",
+                  `${window.location.pathname}?${usp.toString()}`
+                );
               }}
-              className={`text-xs rounded-full border px-2 py-1 ${lang==='ro' ? 'bg-accent text-accent-foreground border-accent' : 'border-border hover:bg-muted'}`}
-            >RO</button>
+              className={`text-xs rounded-full border px-2 py-1 ${
+                lang === "ro"
+                  ? "bg-accent text-accent-foreground border-accent"
+                  : "border-border hover:bg-muted"
+              }`}
+            >
+              RO
+            </button>
             <button
               type="button"
               onClick={() => {
-                if (lang === 'en') return;
+                if (lang === "en") return;
                 userChangedLang.current = true;
-                setLang('en');
+                setLang("en");
                 const usp = new URLSearchParams(window.location.search);
-                usp.set('lang','en');
-                window.history.replaceState(null,'',`${window.location.pathname}?${usp.toString()}`);
+                usp.set("lang", "en");
+                window.history.replaceState(
+                  null,
+                  "",
+                  `${window.location.pathname}?${usp.toString()}`
+                );
               }}
-              className={`text-xs rounded-full border px-2 py-1 ${lang==='en' ? 'bg-accent text-accent-foreground border-accent' : 'border-border hover:bg-muted'}`}
-            >EN</button>
+              className={`text-xs rounded-full border px-2 py-1 ${
+                lang === "en"
+                  ? "bg-accent text-accent-foreground border-accent"
+                  : "border-border hover:bg-muted"
+              }`}
+            >
+              EN
+            </button>
           </div>
           <button
             onClick={() => window.print()}
@@ -502,7 +529,11 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function buildHTML(r: HandoverReport, photosOverride?: string[], lang: 'ro' | 'en' = 'ro') {
+function buildHTML(
+  r: HandoverReport,
+  photosOverride?: string[],
+  lang: "ro" | "en" = "ro"
+) {
   const descriere = r.notes?.trim()
     ? esc(r.notes.trim())
     : "[Marca, modelul, seria, culoarea, starea etc.]";
@@ -553,8 +584,9 @@ function buildHTML(r: HandoverReport, photosOverride?: string[], lang: 'ro' | 'e
       </div>`
     : `<div class="photos-box box no-photos"><div class="muted">(Fără fotografii / No photos)</div></div>`;
 
-  const declarationBlock = lang === 'ro' ? bodyRO : bodyEN;
-  const title = lang === 'ro' ? 'Proces-verbal de predare-primire' : 'Handover Statement';
+  const declarationBlock = lang === "ro" ? bodyRO : bodyEN;
+  const title =
+    lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
   return `
     <div class="layout-stack">
       <div class="text-section">
@@ -567,15 +599,39 @@ function buildHTML(r: HandoverReport, photosOverride?: string[], lang: 'ro' | 'e
         </div>
         <h1>${title}</h1>
         <div class="row row-duo">
-          <span class="field"><span class="label">Data / Date</span><strong>${new Date(r.createdAt).toLocaleString()}</strong></span>
-          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(r.coatNumber)}</strong></span>
+          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
+            r.createdAt
+          ).toLocaleString()}</strong></span>
+          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
+            r.coatNumber
+          )}</strong></span>
         </div>
         <div class="row row-multi">
-          <span class="field"><span class="label">Nume / Name</span><strong>${esc(r.fullName)}</strong></span>
-          ${ r.phone ? `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(r.phone)}</span></span>` : "" }
-          ${ r.email ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(r.email)}</span></span>` : "" }
+          <span class="field"><span class="label">Nume / Name</span><strong>${esc(
+            r.fullName
+          )}</strong></span>
+          ${
+            r.phone
+              ? `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(
+                  r.phone
+                )}</span></span>`
+              : ""
+          }
+          ${
+            r.email
+              ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
+                  r.email
+                )}</span></span>`
+              : ""
+          }
         </div>
-        ${ r.staff ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(r.staff)}</span></div>` : "" }
+        ${
+          r.staff
+            ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
+                r.staff
+              )}</span></div>`
+            : ""
+        }
         <div class="box decl-box">${declarationBlock}</div>
         <div class="signature-line"><span class="sig-label">Semnătură / Signature</span><div class="sig-box"></div></div>
       </div>

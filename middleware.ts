@@ -3,33 +3,33 @@ import { SESS_COOKIE } from "@/lib/auth";
 
 // Paths that don't require auth inside /admin
 const adminPublic = [
-  "/admin/login",
-  "/admin/reset/request",
+  "/private/admin/login",
+  "/private/admin/reset/request",
 ];
 
 // Dynamic reset token route: /admin/reset/<token>
 function isAdminPublicPath(path: string) {
   if (adminPublic.includes(path)) return true;
-  if (path.startsWith("/admin/reset/") && path.split("/").length === 4) return true; // /admin/reset/<token>
+  if (path.startsWith("/private/admin/reset/") && path.split("/").length === 5) return true; // /private/admin/reset/<token>
   return false;
 }
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (!pathname.startsWith("/admin") && !pathname.startsWith("/handover")) {
+  if (!pathname.startsWith("/private/admin") && !pathname.startsWith("/private/handover")) {
     return NextResponse.next();
   }
-  if (pathname.startsWith("/admin") && isAdminPublicPath(pathname)) {
+  if (pathname.startsWith("/private/admin") && isAdminPublicPath(pathname)) {
     return NextResponse.next();
   }
   // Use the same cookie name the login route sets (SESS_COOKIE / "cloack_session")
   const cookie = req.cookies.get(SESS_COOKIE)?.value;
   if (!cookie) {
-    return NextResponse.redirect(new URL("/admin/login", req.url));
+    return NextResponse.redirect(new URL("/private/admin/login", req.url));
   }
   // Staff restriction: if role cookie says staff and path is not within /handover, block.
   const role = req.cookies.get("cloack_role")?.value;
-  if (role === "staff" && !pathname.startsWith("/handover")) {
+  if (role === "staff" && !pathname.startsWith("/private/handover")) {
     if (pathname !== "/not-allowed") {
       return NextResponse.rewrite(new URL("/not-allowed", req.url));
     }
@@ -43,5 +43,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/handover/:path*", "/not-allowed"],
+  matcher: ["/private/admin/:path*", "/private/handover/:path*", "/not-allowed"],
 };

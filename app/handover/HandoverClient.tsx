@@ -10,7 +10,7 @@ export default function HandoverClient() {
   const [email, setEmail] = useState("");
   const [staff, setStaff] = useState("");
   const [notes, setNotes] = useState("");
-  const [language, setLanguage] = useState<'ro' | 'en'>('ro');
+  const [language, setLanguage] = useState<"ro" | "en">("ro");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<HandoverReport[]>([]);
   const coatRef = useRef<HTMLInputElement>(null);
@@ -237,7 +237,11 @@ export default function HandoverClient() {
       try {
         sessionStorage.setItem(`handover:${id}`, JSON.stringify(payload));
       } catch {}
-      window.open(`/handover/print/${encodeURIComponent(id)}?lang=${language}`,'_blank','noopener,noreferrer');
+      window.open(
+        `/private/handover/print/${encodeURIComponent(id)}?lang=${language}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -247,7 +251,13 @@ export default function HandoverClient() {
     try {
       sessionStorage.setItem(`handover:${r.id}`, JSON.stringify(r));
     } catch {}
-    window.open(`/handover/print/${encodeURIComponent(r.id)}?open=pdf&lang=${r.language || 'ro'}`,'_blank','noopener,noreferrer');
+    window.open(
+      `/private/handover/print/${encodeURIComponent(r.id)}?open=pdf&lang=${
+        r.language || "ro"
+      }`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   async function remove(id: string) {
@@ -296,10 +306,14 @@ export default function HandoverClient() {
           </div>
           <div className="mt-4 grid sm:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground">Language</label>
+              <label className="block text-sm font-medium text-foreground">
+                Language
+              </label>
               <select
                 value={language}
-                onChange={(e)=> setLanguage((e.target.value as 'ro'|'en') || 'ro')}
+                onChange={(e) =>
+                  setLanguage((e.target.value as "ro" | "en") || "ro")
+                }
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="ro">Română</option>

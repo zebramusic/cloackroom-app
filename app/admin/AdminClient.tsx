@@ -71,7 +71,7 @@ export default function AdminClient() {
           </div>
           <div className="mt-2">
             <Link
-              href="/handover"
+              href="/private/handover"
               className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted inline-block"
             >
               Open Handover
@@ -94,43 +94,7 @@ export default function AdminClient() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Recent Handovers</h2>
-            <Link
-              href="/handover"
-              className="text-sm text-accent underline underline-offset-2"
-            >
-              View all
-            </Link>
-          </div>
-          <div className="mt-3 grid gap-2">
-            {handovers?.slice(0, 8).map((h) => (
-              <div
-                key={h.id}
-                className="rounded-xl border border-border bg-background p-3"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="font-medium">
-                      #{h.coatNumber} — {h.fullName}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(h.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                  <Link
-                    href={`/handover/print/${encodeURIComponent(h.id)}`}
-                    className="text-xs rounded-full border border-border px-2 py-1 hover:bg-muted"
-                  >
-                    Print
-                  </Link>
-                </div>
-              </div>
-            )) || <div className="text-sm text-muted-foreground">No data.</div>}
-          </div>
-        </div>
+      <div className="mt-6">
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Recent Lost Claims</h2>

@@ -48,11 +48,11 @@ export default function AdminsPage() {
       .then((r) => r.json())
       .then((j) => {
         if (j?.user?.type !== "admin") {
-          window.location.href = "/handover";
+          window.location.href = "/private/handover";
         }
       })
       .catch(() => {
-        window.location.href = "/handover";
+  window.location.href = "/private/handover";
       });
   }, []);
 

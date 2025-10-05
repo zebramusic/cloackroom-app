@@ -14,13 +14,13 @@ export default function NotAllowedPage() {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <a
-            href="/handover"
+            href="/private/handover"
             className="rounded-full bg-accent text-accent-foreground px-5 py-2 text-sm font-medium shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             Go to Handover
           </a>
           <a
-            href="/admin/login"
+            href="/private/admin/login"
             className="text-sm rounded-full border border-border px-5 py-2 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             Switch account
