@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import type { HandoverReport } from "@/app/models/handover";
 import { getDb } from "@/lib/mongodb";
+import { getSessionUser, SESS_COOKIE } from "@/lib/auth";
 
 const store: Map<string, HandoverReport> = new Map();
 
@@ -69,6 +70,17 @@ export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  // Authorization: allow both admin and staff (require authenticated session)
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (me.type !== "admin") {
+    return NextResponse.json({ error: "Admins only" }, { status: 403 });
+  }
+
   const db = await getDb();
   if (db) {
     const col = db.collection<HandoverReport>("handovers");
@@ -77,4 +89,37 @@ export async function DELETE(req: NextRequest) {
   }
   store.delete(id);
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(req: NextRequest) {
+  const body = (await req.json()) as Partial<HandoverReport> & { id?: string };
+  if (!body.id) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+  // Only signedDoc updates supported for now (avoid overwriting other fields accidentally)
+  if (!body.signedDoc) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Allow both staff & admin to attach signed document (capture step after print)
+  if (me.type !== "admin" && me.type !== "staff") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const db = await getDb();
+  if (db) {
+    const col = db.collection<HandoverReport>("handovers");
+    await col.updateOne(
+      { id: body.id },
+      { $set: { signedDoc: body.signedDoc, signedAt: Date.now() } }
+    );
+    const doc = await col.findOne({ id: body.id });
+    return NextResponse.json(doc);
+  }
+  const existing = store.get(body.id);
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const updated = { ...existing, signedDoc: body.signedDoc, signedAt: Date.now() };
+  store.set(body.id, updated);
+  return NextResponse.json(updated);
 }

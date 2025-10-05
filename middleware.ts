@@ -16,7 +16,7 @@ function isAdminPublicPath(path: string) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (!pathname.startsWith("/private/admin") && !pathname.startsWith("/private/handover")) {
+  if (!pathname.startsWith("/private")) {
     return NextResponse.next();
   }
   if (pathname.startsWith("/private/admin") && isAdminPublicPath(pathname)) {
@@ -29,7 +29,7 @@ export async function middleware(req: NextRequest) {
   }
   // Staff restriction: if role cookie says staff and path is not within /handover, block.
   const role = req.cookies.get("cloack_role")?.value;
-  if (role === "staff" && !pathname.startsWith("/private/handover")) {
+  if (role === "staff" && pathname.startsWith("/private/admin")) {
     if (pathname !== "/not-allowed") {
       return NextResponse.rewrite(new URL("/not-allowed", req.url));
     }
@@ -43,5 +43,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/private/admin/:path*", "/private/handover/:path*", "/not-allowed"],
+  matcher: ["/private/:path*", "/not-allowed"],
 };

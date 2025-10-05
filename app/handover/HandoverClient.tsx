@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useToast } from "@/app/private/toast/ToastContext";
 import Image from "next/image";
 import type { HandoverReport } from "@/app/models/handover";
 
 export default function HandoverClient() {
+  const { push } = useToast();
   const [coatNumber, setCoatNumber] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -14,6 +16,9 @@ export default function HandoverClient() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<HandoverReport[]>([]);
   const coatRef = useRef<HTMLInputElement>(null);
+  const [me, setMe] = useState<{ fullName: string; type?: string } | null>(
+    null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -173,6 +178,7 @@ export default function HandoverClient() {
       .then((r) => r.json())
       .then((j) => {
         if (j?.user?.fullName) setStaff((s) => s || j.user.fullName);
+        setMe(j.user || null);
       })
       .catch(() => {});
     const handler = () => void refreshDevices();
@@ -203,7 +209,7 @@ export default function HandoverClient() {
   async function submit() {
     if (!coatNumber.trim() || !fullName.trim()) return;
     if (photos.length < 3) {
-      alert("Please add at least 3 photos.");
+      push({ message: "Please add at least 3 photos.", variant: "error" });
       return;
     }
     setSubmitting(true);
@@ -261,10 +267,71 @@ export default function HandoverClient() {
   }
 
   async function remove(id: string) {
-    await fetch(`/api/handover?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
+    const proceed = confirm(
+      "Delete this handover report? This action cannot be undone."
+    );
+    if (!proceed) return;
+    try {
+      await fetch(`/api/handover?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+    } catch (e) {
+      console.error(e);
+      push({
+        message: "Failed to delete report. Please try again.",
+        variant: "error",
+      });
+    } finally {
+      await fetchList(q);
+    }
+  }
+
+  async function addSignedDoc(r: HandoverReport, file: File) {
+    // Compress image to reasonable size
+    const dataUrl = await fileToJpegDataUrl(file, 1600, 0.85);
+    await fetch(`/api/handover`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: r.id, signedDoc: dataUrl }),
     });
     await fetchList(q);
+  }
+
+  function fileToJpegDataUrl(file: File, maxW: number, quality: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== "string") {
+          reject(new Error("Bad file result"));
+          return;
+        }
+  const img = document.createElement("img");
+        img.onload = () => {
+          try {
+            const scale = Math.min(1, maxW / img.width);
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(reader.result as string);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, w, h);
+            const out = canvas.toDataURL("image/jpeg", quality);
+            resolve(out);
+          } catch (e) {
+            resolve(reader.result as string);
+          }
+        };
+        img.onerror = () => reject(new Error("Image load failed"));
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error("File read error"));
+      reader.readAsDataURL(file);
+    });
   }
 
   return (
@@ -659,12 +726,37 @@ export default function HandoverClient() {
                       >
                         Print
                       </button>
-                      <button
-                        onClick={() => void remove(r.id)}
-                        className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
-                      >
-                        Delete
-                      </button>
+                      {r.signedDoc ? (
+                        <a
+                          href={r.signedDoc}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
+                        >
+                          Signed
+                        </a>
+                      ) : (
+                        <label className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) void addSignedDoc(r, f);
+                            }}
+                          />
+                          Add Signed
+                        </label>
+                      )}
+                      {me?.type === "admin" && (
+                        <button
+                          onClick={() => void remove(r.id)}
+                          className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

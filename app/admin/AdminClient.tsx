@@ -13,6 +13,8 @@ export default function AdminClient() {
   const [health, setHealth] = useState<Health | null>(null);
   const [handovers, setHandovers] = useState<HandoverReport[] | null>(null);
   const [lost, setLost] = useState<LostClaim[] | null>(null);
+  const [staffUsers, setStaffUsers] = useState<number | null>(null);
+  const [adminUsers, setAdminUsers] = useState<number | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -34,6 +36,18 @@ export default function AdminClient() {
         );
         setLost((ls.items || []) as LostClaim[]);
       } catch {}
+      try {
+        const st = await fetch("/api/staff?q=", { cache: "no-store" }).then(
+          (r) => r.json()
+        );
+        setStaffUsers(Array.isArray(st.items) ? st.items.length : 0);
+      } catch {}
+      try {
+        const ad = await fetch("/api/admin/admins", { cache: "no-store" }).then(
+          (r) => r.json()
+        );
+        setAdminUsers(Array.isArray(ad.items) ? ad.items.length : 0);
+      } catch {}
     })();
   }, []);
 
@@ -47,7 +61,7 @@ export default function AdminClient() {
         review recent items.
       </p>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-3">
+      <div className="mt-6 grid gap-6 md:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="text-sm text-muted-foreground">MongoDB</div>
           <div className="mt-1 text-xl font-semibold">{mongoStatus}</div>
@@ -90,6 +104,39 @@ export default function AdminClient() {
             >
               Open Lost & Found
             </Link>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="text-sm text-muted-foreground">Users</div>
+          <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                Admins
+              </div>
+              <div className="text-lg font-semibold leading-none">
+                {adminUsers ?? "—"}
+              </div>
+              <Link
+                href="/private/admin/admins"
+                className="mt-1 inline-block text-xs rounded-full border border-border px-2 py-1 hover:bg-muted"
+              >
+                Manage
+              </Link>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                Staff
+              </div>
+              <div className="text-lg font-semibold leading-none">
+                {staffUsers ?? "—"}
+              </div>
+              <Link
+                href="/private/admin/staff"
+                className="mt-1 inline-block text-xs rounded-full border border-border px-2 py-1 hover:bg-muted"
+              >
+                Manage
+              </Link>
+            </div>
           </div>
         </div>
       </div>

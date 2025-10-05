@@ -47,7 +47,7 @@ export default function StaffAdminPage() {
         }
       })
       .catch(() => {
-  window.location.href = "/private/handover";
+        window.location.href = "/private/handover";
       });
   }, []);
 

@@ -39,17 +39,16 @@ export default function TopbarAdmin() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
-  const toggleMenu = useCallback(
-    () => setMenuOpen((o) => !o),
-    []
-  );
+  const toggleMenu = useCallback(() => setMenuOpen((o) => !o), []);
 
   const NavLinks = () => (
     <>
       <Link
         href="/private/handover"
         className="block px-3 py-2 rounded-lg text-sm hover:bg-muted"
-  aria-current={pathname.startsWith("/private/handover") ? "page" : undefined}
+        aria-current={
+          pathname.startsWith("/private/handover") ? "page" : undefined
+        }
         onClick={closeMenu}
       >
         Handover
@@ -57,7 +56,7 @@ export default function TopbarAdmin() {
       <Link
         href="/private/admin"
         className="block px-3 py-2 rounded-lg text-sm hover:bg-muted"
-  aria-current={pathname === "/private/admin" ? "page" : undefined}
+        aria-current={pathname === "/private/admin" ? "page" : undefined}
         onClick={closeMenu}
       >
         Admin
@@ -194,7 +193,11 @@ export default function TopbarAdmin() {
       </div>
       {/* Mobile slide-over menu */}
       {menuOpen && (
-        <div className="md:hidden fixed inset-0 z-[60]" role="dialog" aria-modal="true">
+        <div
+          className="md:hidden fixed inset-0 z-[60]"
+          role="dialog"
+          aria-modal="true"
+        >
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={closeMenu}

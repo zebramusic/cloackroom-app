@@ -33,7 +33,9 @@ export default function MobileNav() {
         <li>
           <Link
             href="/private/handover"
-            aria-current={pathname.startsWith("/private/handover") ? "page" : undefined}
+            aria-current={
+              pathname.startsWith("/private/handover") ? "page" : undefined
+            }
             className={linkClasses(pathname.startsWith("/private/handover"))}
           >
             <span className="text-xs">Handover</span>
@@ -53,7 +55,9 @@ export default function MobileNav() {
           <li>
             <Link
               href="/private/admin/login"
-              aria-current={pathname === "/private/admin/login" ? "page" : undefined}
+              aria-current={
+                pathname === "/private/admin/login" ? "page" : undefined
+              }
               className={linkClasses(pathname === "/private/admin/login")}
             >
               <span className="text-xs">Login</span>
@@ -65,9 +69,11 @@ export default function MobileNav() {
             <Link
               href="/private/admin/staff"
               aria-current={
-                  pathname.startsWith("/private/admin/staff") ? "page" : undefined
-                }
-                className={linkClasses(pathname.startsWith("/private/admin/staff"))}
+                pathname.startsWith("/private/admin/staff") ? "page" : undefined
+              }
+              className={linkClasses(
+                pathname.startsWith("/private/admin/staff")
+              )}
             >
               <span className="text-xs">Staff</span>
             </Link>
@@ -77,9 +83,13 @@ export default function MobileNav() {
             <Link
               href="/private/admin/admins"
               aria-current={
-                  pathname.startsWith("/private/admin/admins") ? "page" : undefined
-                }
-                className={linkClasses(pathname.startsWith("/private/admin/admins"))}
+                pathname.startsWith("/private/admin/admins")
+                  ? "page"
+                  : undefined
+              }
+              className={linkClasses(
+                pathname.startsWith("/private/admin/admins")
+              )}
             >
               <span className="text-xs">Admins</span>
             </Link>

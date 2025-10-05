@@ -28,7 +28,7 @@ export default function AdminLoginPage() {
         setError(j.error || "Login failed");
         return;
       }
-  router.push("/private/handover");
+      router.push("/private/handover");
     } finally {
       setLoading(false);
     }

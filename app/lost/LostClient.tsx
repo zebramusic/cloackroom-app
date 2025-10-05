@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useToast } from "@/app/private/toast/ToastContext";
 import Image from "next/image";
 import { useLocale } from "@/app/providers/LocaleProvider";
 import type { LostClaim } from "@/app/models/lost";
 
 export default function LostClient() {
+  const { push } = useToast();
   const { t } = useLocale();
   const [fullName, setFullName] = useState("");
   const [address1, setAddress1] = useState("");
@@ -117,7 +119,7 @@ export default function LostClient() {
       setEmail("");
       setPhotos([]);
       await fetchClaims("");
-      alert(t("lost.submitted"));
+  push({ message: t("lost.submitted"), variant: "success" });
     } finally {
       setSubmitting(false);
     }

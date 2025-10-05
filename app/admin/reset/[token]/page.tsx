@@ -34,7 +34,7 @@ export default function ResetPerformPage() {
         setError(j.error || "Reset failed");
       } else {
         setOk(true);
-  setTimeout(() => router.push("/private/admin/login"), 1800);
+        setTimeout(() => router.push("/private/admin/login"), 1800);
       }
     } catch {
       setError("Network error");
