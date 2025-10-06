@@ -3,6 +3,9 @@ export interface HandoverReport {
   coatNumber: string; // the coat tag/number
   fullName: string;
   phone?: string;
+  phoneVerified?: boolean; // manually confirmed via phone call
+  phoneVerifiedAt?: number; // epoch ms when verified
+  phoneVerifiedBy?: string; // staff name who verified
   email?: string;
   staff?: string;
   notes?: string;

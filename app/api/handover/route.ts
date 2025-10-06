@@ -48,6 +48,18 @@ export async function POST(req: NextRequest) {
     coatNumber: String(body.coatNumber),
     fullName: String(body.fullName),
     phone: body.phone ? String(body.phone) : undefined,
+    phoneVerified:
+      body.phone && typeof body.phoneVerified === "boolean"
+        ? body.phoneVerified
+        : undefined,
+    phoneVerifiedAt:
+      body.phoneVerifiedAt && typeof body.phoneVerifiedAt === "number"
+        ? body.phoneVerifiedAt
+        : undefined,
+    phoneVerifiedBy:
+      body.phoneVerifiedBy && typeof body.phoneVerifiedBy === "string"
+        ? body.phoneVerifiedBy
+        : undefined,
     email: body.email ? String(body.email) : undefined,
     staff: body.staff ? String(body.staff) : undefined,
     notes: body.notes ? String(body.notes) : undefined,
