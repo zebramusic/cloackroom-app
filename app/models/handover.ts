@@ -3,6 +3,7 @@ export interface HandoverReport {
   coatNumber: string; // the coat tag/number
   fullName: string;
   phone?: string;
+  phoneVerified?: boolean; // true if phone number was OTP verified at creation time
   email?: string;
   staff?: string;
   notes?: string;

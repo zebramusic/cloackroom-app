@@ -9,6 +9,10 @@ export default function HandoverClient() {
   const [coatNumber, setCoatNumber] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneCodeRequested, setPhoneCodeRequested] = useState(false);
+  const [phoneCode, setPhoneCode] = useState("");
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneBusy, setPhoneBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [staff, setStaff] = useState("");
   const [notes, setNotes] = useState("");
@@ -212,6 +216,10 @@ export default function HandoverClient() {
       push({ message: "Please add at least 3 photos.", variant: "error" });
       return;
     }
+    if (phone.trim() && !phoneVerified) {
+      push({ message: "Verify phone number before saving.", variant: "warning" });
+      return;
+    }
     setSubmitting(true);
     try {
       const id = `handover_${Date.now()}`;
@@ -220,6 +228,7 @@ export default function HandoverClient() {
         coatNumber: coatNumber.trim(),
         fullName: fullName.trim(),
         phone: phone.trim() || undefined,
+        phoneVerified: phone.trim() ? phoneVerified : undefined,
         email: email.trim() || undefined,
         staff: staff.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -235,6 +244,9 @@ export default function HandoverClient() {
       setCoatNumber("");
       setFullName("");
       setPhone("");
+  setPhoneCodeRequested(false);
+  setPhoneCode("");
+  setPhoneVerified(false);
       setEmail("");
       setStaff("");
       setNotes("");
@@ -401,6 +413,113 @@ export default function HandoverClient() {
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
                 placeholder="+40 712 345 678"
               />
+              {phone ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  {phoneVerified ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-600/10 text-green-700 dark:text-green-300 border border-green-600/30 px-2 py-0.5">
+                      ✓ Verified
+                    </span>
+                  ) : phoneCodeRequested ? (
+                    <>
+                      <input
+                        value={phoneCode}
+                        onChange={(e) => setPhoneCode(e.target.value)}
+                        placeholder="Code"
+                        className="w-24 rounded border border-border bg-background px-2 py-1 outline-none focus:ring-2 focus:ring-accent"
+                      />
+                      <button
+                        type="button"
+                        disabled={phoneBusy || phoneCode.trim().length < 4}
+                        onClick={async () => {
+                          setPhoneBusy(true);
+                          try {
+                            const res = await fetch("/api/phone", {
+                              method: "PATCH",
+                              headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ phone, code: phoneCode.trim() }),
+                            });
+                            const j = await res.json();
+                            if (!res.ok) {
+                              push({ message: j.error || "Invalid code", variant: "error" });
+                            } else {
+                              setPhoneVerified(true);
+                              push({ message: "Phone verified", variant: "success" });
+                            }
+                          } finally {
+                            setPhoneBusy(false);
+                          }
+                        }}
+                        className="rounded-full border border-border px-3 py-1 hover:bg-muted disabled:opacity-50"
+                      >
+                        Verify
+                      </button>
+                      <button
+                        type="button"
+                        disabled={phoneBusy}
+                        onClick={async () => {
+                          setPhoneBusy(true);
+                          try {
+                            const res = await fetch("/api/phone", {
+                              method: "POST",
+                              headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ phone }),
+                            });
+                            const j = await res.json();
+                            if (!res.ok) {
+                              push({ message: j.error || "Failed to resend code", variant: "error" });
+                            } else {
+                              push({ message: "Code resent", variant: "info" });
+                            }
+                          } finally {
+                            setPhoneBusy(false);
+                          }
+                        }}
+                        className="rounded-full border border-border px-3 py-1 hover:bg-muted disabled:opacity-50"
+                      >
+                        Resend
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhoneCodeRequested(false);
+                          setPhoneCode("");
+                        }}
+                        className="rounded-full border border-border px-3 py-1 hover:bg-muted"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={phoneBusy || phoneVerified}
+                      onClick={async () => {
+                        if (!phone.trim()) return;
+                        setPhoneBusy(true);
+                        try {
+                          const res = await fetch("/api/phone", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ phone }),
+                          });
+                          const j = await res.json();
+                          if (!res.ok) {
+                            push({ message: j.error || "Failed to request code", variant: "error" });
+                          } else {
+                            setPhoneCodeRequested(true);
+                            push({ message: `Code sent${j.code ? `: ${j.code}` : ""}`, variant: "info" });
+                          }
+                        } finally {
+                          setPhoneBusy(false);
+                        }
+                      }}
+                      className="rounded-full border border-border px-3 py-1 hover:bg-muted disabled:opacity-50"
+                    >
+                      Verify phone
+                    </button>
+                  )}
+                </div>
+              ) : null}
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground">
