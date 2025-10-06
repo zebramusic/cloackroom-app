@@ -33,6 +33,13 @@ export default function HandoverClient() {
     undefined
   );
 
+  // Reset manual verification if phone number is altered after verification
+  useEffect(() => {
+    // If user edits the phone after verifying, force re-verify
+    setPhoneVerified(false);
+    setPhoneVerifiedAt(null);
+  }, [phone]);
+
   async function startCamera() {
     setCameraError(null);
     try {
@@ -215,7 +222,10 @@ export default function HandoverClient() {
       return;
     }
     if (phone.trim() && !phoneVerified) {
-      push({ message: "Please verify the phone by calling it first.", variant: "warning" });
+      push({
+        message: "Please verify the phone by calling it first.",
+        variant: "warning",
+      });
       return;
     }
     setSubmitting(true);
@@ -225,10 +235,12 @@ export default function HandoverClient() {
         id,
         coatNumber: coatNumber.trim(),
         fullName: fullName.trim(),
-  phone: phone.trim() || undefined,
-  phoneVerified: phone.trim() ? phoneVerified : undefined,
-  phoneVerifiedAt: phoneVerifiedAt || undefined,
-  phoneVerifiedBy: phoneVerified ? (staff.trim() || me?.fullName || undefined) : undefined,
+        phone: phone.trim() || undefined,
+        phoneVerified: phone.trim() ? phoneVerified : undefined,
+        phoneVerifiedAt: phoneVerifiedAt || undefined,
+        phoneVerifiedBy: phoneVerified
+          ? staff.trim() || me?.fullName || undefined
+          : undefined,
         email: email.trim() || undefined,
         staff: staff.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -244,8 +256,8 @@ export default function HandoverClient() {
       setCoatNumber("");
       setFullName("");
       setPhone("");
-  setPhoneVerified(false);
-  setPhoneVerifiedAt(null);
+      setPhoneVerified(false);
+      setPhoneVerifiedAt(null);
       setEmail("");
       setStaff("");
       setNotes("");
@@ -363,53 +375,6 @@ export default function HandoverClient() {
         <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              {phone ? (
-                <div className="mt-2 flex items-center gap-2 text-xs">
-                  {phoneVerified ? (
-                    <>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-600/10 text-green-700 dark:text-green-300 border border-green-600/30 px-2 py-0.5">
-                        ✓ Verified by call
-                      </span>
-                      {phoneVerifiedAt ? (
-                        <span className="text-muted-foreground">
-                          {new Date(phoneVerifiedAt).toLocaleTimeString()}
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPhoneVerified(false);
-                          setPhoneVerifiedAt(null);
-                        }}
-                        className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
-                      >
-                        Undo
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!phone.trim()) return;
-                        const ok = confirm(
-                          "Call the number now. Did the client answer and confirm ownership?"
-                        );
-                        if (ok) {
-                          setPhoneVerified(true);
-                          setPhoneVerifiedAt(Date.now());
-                          push({
-                            message: "Phone manually verified.",
-                            variant: "success",
-                          });
-                        }
-                      }}
-                      className="rounded-full border border-border px-3 py-1 hover:bg-muted"
-                    >
-                      Verify by call
-                    </button>
-                  )}
-                </div>
-              ) : null}
               <label className="block text-sm font-medium text-foreground">
                 Coat number
               </label>
@@ -459,7 +424,53 @@ export default function HandoverClient() {
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
                 placeholder="+40 712 345 678"
               />
-              {/* phone verification removed */}
+              {phone ? (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  {phoneVerified ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-600/10 text-green-700 dark:text-green-300 border border-green-600/30 px-2 py-0.5">
+                        ✓ Verified by call
+                      </span>
+                      {phoneVerifiedAt ? (
+                        <span className="text-muted-foreground">
+                          {new Date(phoneVerifiedAt).toLocaleTimeString()}
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhoneVerified(false);
+                          setPhoneVerifiedAt(null);
+                        }}
+                        className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                      >
+                        Undo
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!phone.trim()) return;
+                        const ok = confirm(
+                          "Call the number now. Did the client answer and confirm ownership?"
+                        );
+                        if (ok) {
+                          setPhoneVerified(true);
+                          setPhoneVerifiedAt(Date.now());
+                          push({
+                            message: "Phone manually verified.",
+                            variant: "success",
+                          });
+                        }
+                      }}
+                      className="rounded-full border border-border px-3 py-1 hover:bg-muted"
+                    >
+                      Verify by call
+                    </button>
+                  )}
+                </div>
+              ) : null}
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground">

@@ -16,7 +16,6 @@ export default function PrintClient({ id }: Props) {
   const [lang, setLang] = useState<"ro" | "en">("ro");
   const userChangedLang = useRef(false);
 
-  // Load report: prefer sessionStorage, fallback to API
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(`handover:${id}`);
@@ -287,9 +286,7 @@ const styles = `
   .photos-box.photos-count-1 .grid{ grid-template-columns:minmax(400px,1fr); }
   .photos-box.photos-count-2 .grid{ grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
   .photos-box.photos-count-3 .grid{ grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
-  @media (max-width:900px){
-    .photos-box{ width:100%; }
-  }
+  @media (max-width:900px){ .photos-box{ width:100%; } }
   h1{ font-size:13px; margin:0 0 10px; font-weight:700; letter-spacing:.5px; }
   h2{ font-size:13px; margin:10px 0 6px; font-weight:600; }
   .header{ margin-bottom:10px; padding:6px 8px; background:#f7f7f9; border:1px solid #e2e2e6; border-radius:6px; }
@@ -335,7 +332,7 @@ function esc(s: string) {
 interface DownscaleOptions {
   forceLandscape?: boolean;
   createdAt?: string | Date;
-  watermark?: string; // simple text watermark (timestamp)
+  watermark?: string; // text watermark
 }
 
 async function downscaleImage(
@@ -346,135 +343,90 @@ async function downscaleImage(
   opts: DownscaleOptions = {}
 ): Promise<string> {
   const img = await loadImage(src);
-  // Determine EXIF orientation (best-effort). If fails, default to 1.
   let orientation = 1;
-  try {
-    orientation = await readExifOrientation(src);
-  } catch {}
-
-  // Compute whether original is portrait (after applying EXIF orientation) for optional rotation.
-  const isPortraitLike = img.height > img.width; // base check before EXIF transforms
-  const forceLandscape =
-    opts.forceLandscape !== false && opts.forceLandscape !== undefined
-      ? opts.forceLandscape
-      : true;
-
-  // We apply EXIF orientation first onto an offscreen canvas to normalize the pixels.
+  try { orientation = await readExifOrientation(src); } catch {}
   const normalized = document.createElement("canvas");
   const nctx = normalized.getContext("2d");
   if (!nctx) return src;
-  // Set canvas size based on orientation value (handle rotations 5-8 which swap dimensions)
   const swap = orientation >= 5 && orientation <= 8;
   normalized.width = swap ? img.height : img.width;
   normalized.height = swap ? img.width : img.height;
   applyExifTransform(nctx, orientation, img.width, img.height);
   nctx.drawImage(img, 0, 0);
-
-  // After EXIF normalization, treat normalized canvas as source for further scaling/optional landscape enforcement
   const normW = normalized.width;
   const normH = normalized.height;
-
-  const willRotateForLandscape = forceLandscape && normH > normW; // only rotate if user requested landscape
-  const baseW = willRotateForLandscape ? normH : normW;
-  const baseH = willRotateForLandscape ? normW : normH;
+  const willRotate = opts.forceLandscape && normH > normW;
+  const baseW = willRotate ? normH : normW;
+  const baseH = willRotate ? normW : normH;
   const ratio = Math.min(1, maxW / baseW, maxH / baseH);
   const targetW = Math.max(1, Math.round(baseW * ratio));
   const targetH = Math.max(1, Math.round(baseH * ratio));
-
   const canvas = document.createElement("canvas");
   canvas.width = targetW;
   canvas.height = targetH;
   const ctx = canvas.getContext("2d");
   if (!ctx) return src;
-
-  if (willRotateForLandscape) {
+  if (willRotate) {
     ctx.translate(targetW / 2, targetH / 2);
     ctx.rotate((90 * Math.PI) / 180);
-    const scaleW = targetH / normW;
-    const scaleH = targetW / normH;
-    const scale = Math.min(scaleW, scaleH);
-    const drawW = normW * scale;
-    const drawH = normH * scale;
-    ctx.drawImage(normalized, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.drawImage(normalized, -normW / 2, -normH / 2, normW, normH);
   } else {
     ctx.drawImage(normalized, 0, 0, targetW, targetH);
   }
-
-  // Watermark (timestamp) bottom-right
   if (opts.watermark) {
     const pad = Math.max(8, Math.round(targetW * 0.01));
     ctx.font = `${Math.round(targetW * 0.03)}px sans-serif`;
     ctx.textBaseline = "bottom";
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillStyle = "rgba(255,255,255,0.65)";
     const metrics = ctx.measureText(opts.watermark);
     const boxW = metrics.width + pad * 2;
     const boxH = parseInt(ctx.font, 10) + pad * 1.2;
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
     ctx.fillRect(targetW - boxW - pad, targetH - boxH - pad, boxW, boxH);
     ctx.fillStyle = "#000";
-    ctx.fillText(
-      opts.watermark,
-      targetW - boxW - pad + pad,
-      targetH - pad - pad * 0.2
-    );
+    ctx.fillText(opts.watermark, targetW - boxW - pad + pad, targetH - pad - pad * 0.2);
   }
-
-  try {
-    return canvas.toDataURL("image/jpeg", quality);
-  } catch {
-    return src;
-  }
+  try { return canvas.toDataURL("image/jpeg", quality); } catch { return src; }
 }
 
-// Minimal EXIF orientation reader (JPEG) – best effort, only extracts Orientation tag (274)
 async function readExifOrientation(src: string): Promise<number> {
-  // Fetch as blob/arrayBuffer (may fail if CORS). Silent fallback to 1.
-  const res = await fetch(src, { mode: "cors" });
-  const buf = await res.arrayBuffer();
-  const view = new DataView(buf);
-  // JPEG starts with 0xFFD8
-  if (view.getUint16(0) !== 0xffd8) return 1;
-  let offset = 2;
-  const length = view.byteLength;
-  while (offset < length) {
-    if (view.getUint16(offset) === 0xffe1) {
-      // APP1
-      const exifLength = view.getUint16(offset + 2);
-      const exifStart = offset + 4;
-      // Check for "Exif\0\0"
-      if (
-        view.getUint32(exifStart) === 0x45786966 &&
-        view.getUint16(exifStart + 4) === 0x0000
-      ) {
-        const tiffOffset = exifStart + 6;
-        const endian = view.getUint16(tiffOffset);
-        const little = endian === 0x4949;
-        if (endian !== 0x4949 && endian !== 0x4d4d) return 1;
-        const getUint16 = (o: number) =>
-          little ? view.getUint16(o, true) : view.getUint16(o, false);
-        const getUint32 = (o: number) =>
-          little ? view.getUint32(o, true) : view.getUint32(o, false);
-        const firstIFDOffset = getUint32(tiffOffset + 4);
-        if (firstIFDOffset < 0x00000008) return 1;
-        const ifdStart = tiffOffset + firstIFDOffset;
-        const entries = getUint16(ifdStart);
-        for (let i = 0; i < entries; i++) {
-          const entryOffset = ifdStart + 2 + i * 12;
-          const tag = getUint16(entryOffset);
-          if (tag === 0x0112) {
-            // Orientation
-            const valOffset = entryOffset + 8;
-            return getUint16(valOffset);
+  try {
+    const res = await fetch(src, { mode: "cors" });
+    const buf = await res.arrayBuffer();
+    const view = new DataView(buf);
+    if (view.getUint16(0) !== 0xffd8) return 1;
+    let offset = 2;
+    while (offset < view.byteLength) {
+      if (view.getUint16(offset) === 0xffe1) {
+        const exifLength = view.getUint16(offset + 2);
+        const exifStart = offset + 4;
+        if (
+          view.getUint32(exifStart) === 0x45786966 &&
+          view.getUint16(exifStart + 4) === 0x0000
+        ) {
+          const tiffOffset = exifStart + 6;
+          const endian = view.getUint16(tiffOffset);
+          const little = endian === 0x4949;
+          if (endian !== 0x4949 && endian !== 0x4d4d) return 1;
+          const get16 = (o: number) => (little ? view.getUint16(o, true) : view.getUint16(o, false));
+          const get32 = (o: number) => (little ? view.getUint32(o, true) : view.getUint32(o, false));
+          const firstIFDOffset = get32(tiffOffset + 4);
+          if (firstIFDOffset < 8) return 1;
+          const ifdStart = tiffOffset + firstIFDOffset;
+          const entries = get16(ifdStart);
+          for (let i = 0; i < entries; i++) {
+            const entryOffset = ifdStart + 2 + i * 12;
+            const tag = get16(entryOffset);
+            if (tag === 0x0112) return get16(entryOffset + 8);
           }
         }
+        offset += 2 + exifLength;
+      } else if (view.getUint16(offset) === 0xffda) {
+        break;
+      } else {
+        offset += 2 + view.getUint16(offset + 2);
       }
-      offset += 2 + exifLength;
-    } else if (view.getUint16(offset) === 0xffda) {
-      break; // Start of Scan – end of metadata
-    } else {
-      offset += 2 + view.getUint16(offset + 2);
     }
-  }
+  } catch {}
   return 1;
 }
 
@@ -485,37 +437,14 @@ function applyExifTransform(
   height: number
 ) {
   switch (orientation) {
-    case 2: // horizontal flip
-      ctx.translate(width, 0);
-      ctx.scale(-1, 1);
-      break;
-    case 3: // 180°
-      ctx.translate(width, height);
-      ctx.rotate(Math.PI);
-      break;
-    case 4: // vertical flip
-      ctx.translate(0, height);
-      ctx.scale(1, -1);
-      break;
-    case 5: // vertical flip + 90° CW
-      ctx.rotate(0.5 * Math.PI);
-      ctx.scale(1, -1);
-      break;
-    case 6: // 90° CW
-      ctx.rotate(0.5 * Math.PI);
-      ctx.translate(0, -height);
-      break;
-    case 7: // horizontal flip + 90° CW
-      ctx.rotate(0.5 * Math.PI);
-      ctx.translate(width, -height);
-      ctx.scale(-1, 1);
-      break;
-    case 8: // 90° CCW
-      ctx.rotate(-0.5 * Math.PI);
-      ctx.translate(-width, 0);
-      break;
-    default:
-      break; // orientation 1: no transform
+    case 2: ctx.translate(width, 0); ctx.scale(-1, 1); break;
+    case 3: ctx.translate(width, height); ctx.rotate(Math.PI); break;
+    case 4: ctx.translate(0, height); ctx.scale(1, -1); break;
+    case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
+    case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -height); break;
+    case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(width, -height); ctx.scale(-1, 1); break;
+    case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-width, 0); break;
+    default: break;
   }
 }
 
@@ -537,107 +466,47 @@ function buildHTML(
   const descriere = r.notes?.trim()
     ? esc(r.notes.trim())
     : "[Marca, modelul, seria, culoarea, starea etc.]";
-
   const staffText = (r.staff && r.staff.trim()) || "(staff member)";
+
   const bodyRO = `
-    <h2 style="margin:0 0 6px;font-size:13px">Declarație pe propria răspundere</h2>
-    <p>Subsemnatul(a) <strong>${esc(
-      r.fullName
-    )}</strong>, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. <strong>${esc(
-    r.coatNumber
-  )}</strong> cu următoarele caracteristici: <strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
+    <h2 style=\"margin:0 0 6px;font-size:13px\">Declarație pe propria răspundere</h2>
+    <p>Subsemnatul(a) <strong>${esc(r.fullName)}</strong>, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. <strong>${esc(r.coatNumber)}</strong> cu următoarele caracteristici: <strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
     <p>Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.</p>
     <p>Predarea se face strict pe răspunderea mea și în baza declarațiilor mele.</p>
-    <p>Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului <strong>${esc(
-      staffText
-    )}</strong>, reprezentant al Zebra Music Production s.r.l..</p>
+    <p>Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului <strong>${esc(staffText)}</strong>, reprezentant al Zebra Music Production s.r.l..</p>
   `;
 
   const bodyEN = `
-    <h2 style="margin:8px 0 6px;font-size:13px">Self-Declaration</h2>
-    <p>I, <strong>${esc(
-      r.fullName
-    )}</strong>, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. <strong>${esc(
-    r.coatNumber
-  )}</strong> with the following characteristics: <strong>${descriere}</strong>, without presenting the ticket received at deposit, as I declare I have lost it.</p>
+    <h2 style=\"margin:8px 0 6px;font-size:13px\">Self-Declaration</h2>
+    <p>I, <strong>${esc(r.fullName)}</strong>, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. <strong>${esc(r.coatNumber)}</strong> with the following characteristics: <strong>${descriere}</strong>, without presenting the ticket received at deposit, as I declare I have lost it.</p>
     <p>I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.</p>
     <p>The handover is made strictly under my responsibility and based on my statements.</p>
-    <p>This is the statement that I make, sign, and uphold in the presence of <strong>${esc(
-      staffText
-    )}</strong>, representative of Zebra Music Production S.R.L.</p>
+    <p>This is the statement that I make, sign, and uphold in the presence of <strong>${esc(staffText)}</strong>, representative of Zebra Music Production S.R.L.</p>
   `;
 
   const imgs = photosOverride ?? r.photos ?? [];
   const shown = imgs.slice(0, 4);
   const extraCount = Math.max(0, imgs.length - shown.length);
   const photos = shown.length
-    ? `<div class="photos-box box photos-count-${shown.length}">
-        <div class="photos-heading">Fotografii / Photos</div>
-        <div class="grid">
-          ${shown.map((p, i) => `<img src="${p}" alt="photo-${i}" />`).join("")}
-        </div>
-        ${
+    ? `<div class=\"photos-box box photos-count-${shown.length}\">\n        <div class=\"photos-heading\">Fotografii / Photos</div>\n        <div class=\"grid\">\n          ${shown.map((p, i) => `<img src=\"${p}\" alt=\"photo-${i}\" />`).join("")}\n        </div>\n        ${
           extraCount
-            ? `<div class="muted" style="margin-top:6px">+${extraCount} alte fotografii / more photos</div>`
+            ? `<div class=\"muted\" style=\"margin-top:6px\">+${extraCount} alte fotografii / more photos</div>`
             : ""
-        }
-      </div>`
-    : `<div class="photos-box box no-photos"><div class="muted">(Fără fotografii / No photos)</div></div>`;
+        }\n      </div>`
+    : `<div class=\"photos-box box no-photos\"><div class=\"muted\">(Fără fotografii / No photos)</div></div>`;
+
+  let phoneField = "";
+  if (r.phone) {
+    phoneField = `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(r.phone)}`;
+    if (r.phoneVerified) {
+      phoneField += ' <span style=\"color:green;font-size:10px;margin-left:4px;font-weight:600;\">(Verified)</span>';
+    }
+    phoneField += "</span></span>";
+  }
 
   const declarationBlock = lang === "ro" ? bodyRO : bodyEN;
-  const title =
-    lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
+  const title = lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
+
   return `
-    <div class="layout-stack">
-      <div class="text-section">
-        <div class="header header-inline">
-          <span class="company">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>
-          <span class="sep">|</span>
-          <span class="muted small">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>
-          <span class="sep">|</span>
-          <span class="muted small">Tel: 0751292540</span>
-        </div>
-        <h1>${title}</h1>
-        <div class="row row-duo">
-          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
-            r.createdAt
-          ).toLocaleString()}</strong></span>
-          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
-            r.coatNumber
-          )}</strong></span>
-        </div>
-        <div class="row row-multi">
-          <span class="field"><span class="label">Nume / Name</span><strong>${esc(
-            r.fullName
-          )}</strong></span>
-          ${
-            r.phone
-              ? `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(
-                  r.phone
-                )}$${'{'} r.phoneVerified ? ' <span style=\\"color:green;font-size:10px;margin-left:4px\\">(Verified)</span>' : '' ${'}'}</span></span>`
-              : ""
-          }
-          ${
-            r.email
-              ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
-                  r.email
-                )}</span></span>`
-              : ""
-          }
-        </div>
-        ${
-          r.staff
-            ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
-                r.staff
-              )}</span></div>`
-            : ""
-        }
-        <div class="box decl-box">${declarationBlock}</div>
-        <div class="signature-line"><span class="sig-label">Semnătură / Signature</span><div class="sig-box"></div></div>
-      </div>
-      <div class="photos-section">
-        ${photos}
-      </div>
-    </div>
-  `;
+    <div class=\"layout-stack\">\n      <div class=\"text-section\">\n        <div class=\"header header-inline\">\n          <span class=\"company\">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class=\"row row-duo\">\n          <span class=\"field\"><span class=\"label\">Data / Date</span><strong>${new Date(r.createdAt).toLocaleString()}</strong></span>\n          <span class=\"field\"><span class=\"label\">Tichet / Ticket</span><strong>${esc(r.coatNumber)}</strong></span>\n        </div>\n        <div class=\"row row-multi\">\n          <span class=\"field\"><span class=\"label\">Nume / Name</span><strong>${esc(r.fullName)}</strong></span>\n          ${phoneField}\n          ${r.email ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(r.email)}</span></span>` : ""}\n        </div>\n        ${r.staff ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(r.staff)}</span></div>` : ""}\n        <div class=\"box decl-box\">${declarationBlock}</div>\n        <div class=\"signature-line\"><span class=\"sig-label\">Semnătură / Signature</span><div class=\"sig-box\"></div></div>\n      </div>\n      <div class=\"photos-section\">${photos}</div>\n    </div>\n  `;
 }
