@@ -1116,7 +1116,7 @@ export default function HandoverClient() {
               <div className="h-9 border-b border-border w-64" />
             </div>
           </div>
-          <div className="mt-6 flex justify-end">
+          <div className="mt-10 hidden md:flex justify-end">
             <button
               disabled={submitting || !coatNumber || !fullName}
               aria-disabled={photos.length < 4}
@@ -1129,6 +1129,56 @@ export default function HandoverClient() {
         </div>
         {/* Right column (progress + reports) was already injected earlier; ensure no duplication */}
       </div>
+      {/* Mobile bottom action bar */}
+      <MobileBottomBar
+        progressItems={progressItems}
+        submitting={submitting}
+        ready={!!readyToSubmit}
+        onSubmit={submit}
+      />
     </main>
+  );
+}
+
+// --- Mobile bottom bar component (inline to keep file-local) ---
+function MobileBottomBar({
+  progressItems,
+  submitting,
+  ready,
+  onSubmit,
+}: {
+  progressItems: { key: string; label: string; done: boolean }[];
+  submitting: boolean;
+  ready: boolean;
+  onSubmit: () => void;
+}) {
+  const doneCount = progressItems.filter((p) => p.done).length;
+  const total = progressItems.length;
+  const pct = Math.round((doneCount / total) * 100);
+  return (
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border px-4 py-3 flex items-center gap-4">
+      <div className="flex-1">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+          <span>Progress</span>
+          <span>
+            {doneCount}/{total}
+          </span>
+        </div>
+        <div className="h-2 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full bg-accent transition-all"
+            style={{ width: pct + "%" }}
+            aria-label={`Progress ${pct}%`}
+          />
+        </div>
+      </div>
+      <button
+        disabled={!ready || submitting}
+        onClick={onSubmit}
+        className="rounded-full bg-accent text-accent-foreground px-4 py-2 text-sm font-semibold shadow disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {submitting ? "Saving…" : ready ? "Save" : "Incomplete"}
+      </button>
+    </div>
   );
 }
