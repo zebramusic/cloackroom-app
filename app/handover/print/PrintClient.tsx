@@ -344,7 +344,9 @@ async function downscaleImage(
 ): Promise<string> {
   const img = await loadImage(src);
   let orientation = 1;
-  try { orientation = await readExifOrientation(src); } catch {}
+  try {
+    orientation = await readExifOrientation(src);
+  } catch {}
   const normalized = document.createElement("canvas");
   const nctx = normalized.getContext("2d");
   if (!nctx) return src;
@@ -383,9 +385,17 @@ async function downscaleImage(
     const boxH = parseInt(ctx.font, 10) + pad * 1.2;
     ctx.fillRect(targetW - boxW - pad, targetH - boxH - pad, boxW, boxH);
     ctx.fillStyle = "#000";
-    ctx.fillText(opts.watermark, targetW - boxW - pad + pad, targetH - pad - pad * 0.2);
+    ctx.fillText(
+      opts.watermark,
+      targetW - boxW - pad + pad,
+      targetH - pad - pad * 0.2
+    );
   }
-  try { return canvas.toDataURL("image/jpeg", quality); } catch { return src; }
+  try {
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch {
+    return src;
+  }
 }
 
 async function readExifOrientation(src: string): Promise<number> {
@@ -407,8 +417,10 @@ async function readExifOrientation(src: string): Promise<number> {
           const endian = view.getUint16(tiffOffset);
           const little = endian === 0x4949;
           if (endian !== 0x4949 && endian !== 0x4d4d) return 1;
-          const get16 = (o: number) => (little ? view.getUint16(o, true) : view.getUint16(o, false));
-          const get32 = (o: number) => (little ? view.getUint32(o, true) : view.getUint32(o, false));
+          const get16 = (o: number) =>
+            little ? view.getUint16(o, true) : view.getUint16(o, false);
+          const get32 = (o: number) =>
+            little ? view.getUint32(o, true) : view.getUint32(o, false);
           const firstIFDOffset = get32(tiffOffset + 4);
           if (firstIFDOffset < 8) return 1;
           const ifdStart = tiffOffset + firstIFDOffset;
@@ -437,14 +449,37 @@ function applyExifTransform(
   height: number
 ) {
   switch (orientation) {
-    case 2: ctx.translate(width, 0); ctx.scale(-1, 1); break;
-    case 3: ctx.translate(width, height); ctx.rotate(Math.PI); break;
-    case 4: ctx.translate(0, height); ctx.scale(1, -1); break;
-    case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
-    case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -height); break;
-    case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(width, -height); ctx.scale(-1, 1); break;
-    case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-width, 0); break;
-    default: break;
+    case 2:
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+      break;
+    case 3:
+      ctx.translate(width, height);
+      ctx.rotate(Math.PI);
+      break;
+    case 4:
+      ctx.translate(0, height);
+      ctx.scale(1, -1);
+      break;
+    case 5:
+      ctx.rotate(0.5 * Math.PI);
+      ctx.scale(1, -1);
+      break;
+    case 6:
+      ctx.rotate(0.5 * Math.PI);
+      ctx.translate(0, -height);
+      break;
+    case 7:
+      ctx.rotate(0.5 * Math.PI);
+      ctx.translate(width, -height);
+      ctx.scale(-1, 1);
+      break;
+    case 8:
+      ctx.rotate(-0.5 * Math.PI);
+      ctx.translate(-width, 0);
+      break;
+    default:
+      break;
   }
 }
 
@@ -470,43 +505,81 @@ function buildHTML(
 
   const bodyRO = `
     <h2 style=\"margin:0 0 6px;font-size:13px\">Declarație pe propria răspundere</h2>
-    <p>Subsemnatul(a) <strong>${esc(r.fullName)}</strong>, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. <strong>${esc(r.coatNumber)}</strong> cu următoarele caracteristici: <strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
+    <p>Subsemnatul(a) <strong>${esc(
+      r.fullName
+    )}</strong>, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. <strong>${esc(
+    r.coatNumber
+  )}</strong> cu următoarele caracteristici: <strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
     <p>Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.</p>
     <p>Predarea se face strict pe răspunderea mea și în baza declarațiilor mele.</p>
-    <p>Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului <strong>${esc(staffText)}</strong>, reprezentant al Zebra Music Production s.r.l..</p>
+    <p>Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului <strong>${esc(
+      staffText
+    )}</strong>, reprezentant al Zebra Music Production s.r.l..</p>
   `;
 
   const bodyEN = `
     <h2 style=\"margin:8px 0 6px;font-size:13px\">Self-Declaration</h2>
-    <p>I, <strong>${esc(r.fullName)}</strong>, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. <strong>${esc(r.coatNumber)}</strong> with the following characteristics: <strong>${descriere}</strong>, without presenting the ticket received at deposit, as I declare I have lost it.</p>
+    <p>I, <strong>${esc(
+      r.fullName
+    )}</strong>, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. <strong>${esc(
+    r.coatNumber
+  )}</strong> with the following characteristics: <strong>${descriere}</strong>, without presenting the ticket received at deposit, as I declare I have lost it.</p>
     <p>I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.</p>
     <p>The handover is made strictly under my responsibility and based on my statements.</p>
-    <p>This is the statement that I make, sign, and uphold in the presence of <strong>${esc(staffText)}</strong>, representative of Zebra Music Production S.R.L.</p>
+    <p>This is the statement that I make, sign, and uphold in the presence of <strong>${esc(
+      staffText
+    )}</strong>, representative of Zebra Music Production S.R.L.</p>
   `;
 
   const imgs = photosOverride ?? r.photos ?? [];
   const shown = imgs.slice(0, 4);
   const extraCount = Math.max(0, imgs.length - shown.length);
   const photos = shown.length
-    ? `<div class=\"photos-box box photos-count-${shown.length}\">\n        <div class=\"photos-heading\">Fotografii / Photos</div>\n        <div class=\"grid\">\n          ${shown.map((p, i) => `<img src=\"${p}\" alt=\"photo-${i}\" />`).join("")}\n        </div>\n        ${
-          extraCount
-            ? `<div class=\"muted\" style=\"margin-top:6px\">+${extraCount} alte fotografii / more photos</div>`
-            : ""
-        }\n      </div>`
+    ? `<div class=\"photos-box box photos-count-${
+        shown.length
+      }\">\n        <div class=\"photos-heading\">Fotografii / Photos</div>\n        <div class=\"grid\">\n          ${shown
+        .map((p, i) => `<img src=\"${p}\" alt=\"photo-${i}\" />`)
+        .join("")}\n        </div>\n        ${
+        extraCount
+          ? `<div class=\"muted\" style=\"margin-top:6px\">+${extraCount} alte fotografii / more photos</div>`
+          : ""
+      }\n      </div>`
     : `<div class=\"photos-box box no-photos\"><div class=\"muted\">(Fără fotografii / No photos)</div></div>`;
 
   let phoneField = "";
   if (r.phone) {
-    phoneField = `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(r.phone)}`;
+    phoneField = `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(
+      r.phone
+    )}`;
     if (r.phoneVerified) {
-      phoneField += ' <span style=\"color:green;font-size:10px;margin-left:4px;font-weight:600;\">(Verified)</span>';
+      phoneField +=
+        ' <span style="color:green;font-size:10px;margin-left:4px;font-weight:600;">(Verified)</span>';
     }
     phoneField += "</span></span>";
   }
 
   const declarationBlock = lang === "ro" ? bodyRO : bodyEN;
-  const title = lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
+  const title =
+    lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
 
   return `
-    <div class=\"layout-stack\">\n      <div class=\"text-section\">\n        <div class=\"header header-inline\">\n          <span class=\"company\">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class=\"row row-duo\">\n          <span class=\"field\"><span class=\"label\">Data / Date</span><strong>${new Date(r.createdAt).toLocaleString()}</strong></span>\n          <span class=\"field\"><span class=\"label\">Tichet / Ticket</span><strong>${esc(r.coatNumber)}</strong></span>\n        </div>\n        <div class=\"row row-multi\">\n          <span class=\"field\"><span class=\"label\">Nume / Name</span><strong>${esc(r.fullName)}</strong></span>\n          ${phoneField}\n          ${r.email ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(r.email)}</span></span>` : ""}\n        </div>\n        ${r.staff ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(r.staff)}</span></div>` : ""}\n        <div class=\"box decl-box\">${declarationBlock}</div>\n        <div class=\"signature-line\"><span class=\"sig-label\">Semnătură / Signature</span><div class=\"sig-box\"></div></div>\n      </div>\n      <div class=\"photos-section\">${photos}</div>\n    </div>\n  `;
+    <div class=\"layout-stack\">\n      <div class=\"text-section\">\n        <div class=\"header header-inline\">\n          <span class=\"company\">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class=\"row row-duo\">\n          <span class=\"field\"><span class=\"label\">Data / Date</span><strong>${new Date(
+    r.createdAt
+  ).toLocaleString()}</strong></span>\n          <span class=\"field\"><span class=\"label\">Tichet / Ticket</span><strong>${esc(
+    r.coatNumber
+  )}</strong></span>\n        </div>\n        <div class=\"row row-multi\">\n          <span class=\"field\"><span class=\"label\">Nume / Name</span><strong>${esc(
+    r.fullName
+  )}</strong></span>\n          ${phoneField}\n          ${
+    r.email
+      ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
+          r.email
+        )}</span></span>`
+      : ""
+  }\n        </div>\n        ${
+    r.staff
+      ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
+          r.staff
+        )}</span></div>`
+      : ""
+  }\n        <div class=\"box decl-box\">${declarationBlock}</div>\n        <div class=\"signature-line\"><span class=\"sig-label\">Semnătură / Signature</span><div class=\"sig-box\"></div></div>\n      </div>\n      <div class=\"photos-section\">${photos}</div>\n    </div>\n  `;
 }
