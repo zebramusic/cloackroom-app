@@ -74,35 +74,6 @@ export default function HandoverClient() {
     },
   ];
   const [activePhotoSlot, setActivePhotoSlot] = useState<number | null>(null);
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
-
-  // Derived completion statuses for UX progress checklist
-  const hasBasicInfo = !!coatNumber.trim() && !!fullName.trim();
-  const phoneRequirementMet = !phone.trim() || (phone.trim() && phoneVerified);
-  const hasRequiredPhotos = photos.length >= 4;
-  const readyToSubmit = hasBasicInfo && phoneRequirementMet && hasRequiredPhotos;
-
-  const progressItems: { key: string; label: string; done: boolean; hint?: string }[] = [
-    {
-      key: "basic",
-      label: "Client & coat info",
-      done: !!hasBasicInfo,
-      hint: !hasBasicInfo ? "Coat number & full name required" : undefined,
-    },
-    {
-      key: "phone",
-      label: "Phone verification",
-      done: !!phoneRequirementMet,
-      hint: !phoneRequirementMet ? "Call & confirm ownership" : undefined,
-    },
-    {
-      key: "photos",
-      label: "4 required photos",
-      done: !!hasRequiredPhotos,
-      hint: !hasRequiredPhotos ? `${photos.length}/4 captured` : undefined,
-    },
-    { key: "submit", label: "Save & print", done: !!readyToSubmit },
-  ];
 
   // Reset manual verification if phone number is altered after verification
   useEffect(() => {
@@ -289,26 +260,9 @@ export default function HandoverClient() {
   }
 
   async function submit() {
-    setAttemptedSubmit(true);
-    if (!coatNumber.trim() || !fullName.trim()) {
-      push({ message: "Fill in coat number and full name.", variant: "error" });
-      return;
-    }
-    if (photos.length < 4) {
-      push({
-        message:
-          "Please add the 4 required photos (ID, client+ID, clothing item, distinctive mark).",
-        variant: "error",
-      });
-      return;
-    }
-    if (phone.trim() && !phoneVerified) {
-      push({
-        message: "Please verify the phone by calling it first.",
-        variant: "warning",
-      });
-      return;
-    }
+    if (!coatNumber.trim() || !fullName.trim()) return;
+    if (photos.length < 4) return;
+    if (phone.trim() && !phoneVerified) return;
     setSubmitting(true);
     try {
       const id = `handover_${Date.now()}`;
@@ -454,15 +408,10 @@ export default function HandoverClient() {
 
       <div className="mt-6 grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-4">
-          {/* Section 1: Basic client info */}
-          <div className="flex items-center gap-2 mb-2 mt-6 first:mt-0">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">1</span>
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">Client & Coat Info</h2>
-          </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground">
-                Coat number <span className="text-red-600">*</span>
+                Coat number
               </label>
               <input
                 ref={coatRef}
@@ -471,13 +420,10 @@ export default function HandoverClient() {
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
                 placeholder="e.g. 127"
               />
-              {attemptedSubmit && !coatNumber.trim() && (
-                <p className="mt-1 text-xs text-red-600">Coat number is required.</p>
-              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground">
-                Full name <span className="text-red-600">*</span>
+                Full name
               </label>
               <input
                 value={fullName}
@@ -485,17 +431,9 @@ export default function HandoverClient() {
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Jane Doe"
               />
-              {attemptedSubmit && !fullName.trim() && (
-                <p className="mt-1 text-xs text-red-600">Full name is required.</p>
-              )}
             </div>
           </div>
-          {/* Section 2: Contact & staff */}
-          <div className="flex items-center gap-2 mb-2 mt-8">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">2</span>
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">Contact & Ownership</h2>
-          </div>
-          <div className="grid sm:grid-cols-4 gap-4">
+          <div className="mt-4 grid sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground">
                 Language
@@ -512,7 +450,9 @@ export default function HandoverClient() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground">Phone</label>
+              <label className="block text-sm font-medium text-foreground">
+                Phone
+              </label>
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -661,8 +601,12 @@ export default function HandoverClient() {
           </div>
           {/* Section 3: Description */}
           <div className="flex items-center gap-2 mb-2 mt-8">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">3</span>
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">Item Description</h2>
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">
+              3
+            </span>
+            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+              Item Description
+            </h2>
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground">
@@ -675,12 +619,18 @@ export default function HandoverClient() {
               className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
               placeholder="Marca, modelul, seria, culoarea, starea etc."
             />
-            <div className="mt-1 text-[10px] text-muted-foreground text-right">{notes.length} chars</div>
+            <div className="mt-1 text-[10px] text-muted-foreground text-right">
+              {notes.length} chars
+            </div>
           </div>
           {/* Section 4: Photos */}
           <div className="flex items-center gap-2 mb-2 mt-8">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">4</span>
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">Evidence Photos</h2>
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">
+              4
+            </span>
+            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+              Evidence Photos
+            </h2>
           </div>
           {/* Photos capture/upload (require ordered 4) */}
           <div className="mt-6">
@@ -1030,8 +980,12 @@ export default function HandoverClient() {
           </div>
           {/* Section 5: Declarations Preview */}
           <div className="flex items-center gap-2 mb-2 mt-10">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">5</span>
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">Declarations Preview</h2>
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-semibold">
+              5
+            </span>
+            <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+              Declarations Preview
+            </h2>
           </div>
           {/* Preview of declaration text: RO + EN */}
           <div className="mt-4">
@@ -1116,7 +1070,7 @@ export default function HandoverClient() {
               <div className="h-9 border-b border-border w-64" />
             </div>
           </div>
-          <div className="mt-10 hidden md:flex justify-end">
+          <div className="mt-6 flex justify-end">
             <button
               disabled={submitting || !coatNumber || !fullName}
               aria-disabled={photos.length < 4}
@@ -1127,58 +1081,7 @@ export default function HandoverClient() {
             </button>
           </div>
         </div>
-        {/* Right column (progress + reports) was already injected earlier; ensure no duplication */}
       </div>
-      {/* Mobile bottom action bar */}
-      <MobileBottomBar
-        progressItems={progressItems}
-        submitting={submitting}
-        ready={!!readyToSubmit}
-        onSubmit={submit}
-      />
     </main>
-  );
-}
-
-// --- Mobile bottom bar component (inline to keep file-local) ---
-function MobileBottomBar({
-  progressItems,
-  submitting,
-  ready,
-  onSubmit,
-}: {
-  progressItems: { key: string; label: string; done: boolean }[];
-  submitting: boolean;
-  ready: boolean;
-  onSubmit: () => void;
-}) {
-  const doneCount = progressItems.filter((p) => p.done).length;
-  const total = progressItems.length;
-  const pct = Math.round((doneCount / total) * 100);
-  return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border px-4 py-3 flex items-center gap-4">
-      <div className="flex-1">
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-          <span>Progress</span>
-          <span>
-            {doneCount}/{total}
-          </span>
-        </div>
-        <div className="h-2 rounded-full bg-muted overflow-hidden">
-          <div
-            className="h-full bg-accent transition-all"
-            style={{ width: pct + "%" }}
-            aria-label={`Progress ${pct}%`}
-          />
-        </div>
-      </div>
-      <button
-        disabled={!ready || submitting}
-        onClick={onSubmit}
-        className="rounded-full bg-accent text-accent-foreground px-4 py-2 text-sm font-semibold shadow disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {submitting ? "Saving…" : ready ? "Save" : "Incomplete"}
-      </button>
-    </div>
   );
 }
