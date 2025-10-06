@@ -32,6 +32,13 @@ export default function HandoverClient() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(
     undefined
   );
+  // Expected first four photos order guidance
+  const expectedPhotoLabels = [
+    "Client ID document",
+    "Client with ID",
+    "Clothing item",
+    "Distinctive mark on clothing",
+  ];
 
   // Reset manual verification if phone number is altered after verification
   useEffect(() => {
@@ -44,8 +51,12 @@ export default function HandoverClient() {
 
   // Phone call verification state
   const [callPhase, setCallPhase] = useState<
-    "idle" | "dialing" | "await-return" | "ready-confirm"
+    "idle" | "dialing" | "ready-confirm"
   >("idle");
+  const callPhaseRef = useRef(callPhase);
+  useEffect(() => {
+    callPhaseRef.current = callPhase;
+  }, [callPhase]);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const wasHiddenDuringDial = useRef(false);
 
@@ -58,13 +69,12 @@ export default function HandoverClient() {
       }
       // Returned to page
       if (
-        callPhase === "dialing" &&
+        callPhaseRef.current === "dialing" &&
         wasHiddenDuringDial.current &&
         callStartedAt &&
-        Date.now() - callStartedAt > 1500 // minimal threshold
-      ) {
+        Date.now() - callStartedAt > 1200
+      )
         setCallPhase("ready-confirm");
-      }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
@@ -73,49 +83,18 @@ export default function HandoverClient() {
   async function startCamera() {
     setCameraError(null);
     try {
-      if (
-        typeof navigator === "undefined" ||
-        !navigator.mediaDevices?.getUserMedia
-      ) {
-        setCameraError(
-          "Camera not supported. Use a modern browser and ensure the site is opened via HTTPS or localhost."
-        );
-        return;
-      }
-      const isLocalhost =
-        typeof location !== "undefined" &&
-        /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-      const isSecure =
-        typeof window !== "undefined" &&
-        typeof window.isSecureContext === "boolean"
-          ? window.isSecureContext
-          : false;
-      if (!isLocalhost && !isSecure) {
-        setCameraError(
-          "Camera requires a secure context (HTTPS). Please use HTTPS or localhost."
-        );
-        return;
-      }
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
-        setStream(null);
-      }
-      const baseVideo: MediaTrackConstraints = selectedDeviceId
-        ? { deviceId: { exact: selectedDeviceId } }
-        : {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            aspectRatio: { ideal: 16 / 9 },
-          };
       const constraints: MediaStreamConstraints = {
-        video: baseVideo,
+        video: selectedDeviceId
+          ? { deviceId: { exact: selectedDeviceId } }
+          : { facingMode: "environment" },
         audio: false,
       };
       const s = await navigator.mediaDevices.getUserMedia(constraints);
+      // Stop any existing stream first
+      stream?.getTracks().forEach((tr) => tr.stop());
       setStream(s);
       if (videoRef.current) {
-        videoRef.current.srcObject = s as MediaStream;
+        (videoRef.current as any).srcObject = s;
         try {
           await videoRef.current.play();
         } catch (e) {
@@ -247,8 +226,12 @@ export default function HandoverClient() {
 
   async function submit() {
     if (!coatNumber.trim() || !fullName.trim()) return;
-    if (photos.length < 3) {
-      push({ message: "Please add at least 3 photos.", variant: "error" });
+    if (photos.length < 4) {
+      push({
+        message:
+          "Please add the 4 required photos (ID, client+ID, clothing item, distinctive mark).",
+        variant: "error",
+      });
       return;
     }
     if (phone.trim() && !phoneVerified) {
@@ -455,7 +438,7 @@ export default function HandoverClient() {
                 placeholder="+40 712 345 678"
               />
               {phone ? (
-                <div className="mt-2 flex items-center gap-2 text-xs">
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                   {phoneVerified ? (
                     <>
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-600/10 text-green-700 dark:text-green-300 border border-green-600/30 px-2 py-0.5">
@@ -471,6 +454,7 @@ export default function HandoverClient() {
                         onClick={() => {
                           setPhoneVerified(false);
                           setPhoneVerifiedAt(null);
+                          setCallPhase("idle");
                         }}
                         className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
                       >
@@ -478,26 +462,93 @@ export default function HandoverClient() {
                       </button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!phone.trim()) return;
-                        const ok = confirm(
-                          "Call the number now. Did the client answer and confirm ownership?"
-                        );
-                        if (ok) {
-                          setPhoneVerified(true);
-                          setPhoneVerifiedAt(Date.now());
-                          push({
-                            message: "Phone manually verified.",
-                            variant: "success",
-                          });
-                        }
-                      }}
-                      className="rounded-full border border-border px-3 py-1 hover:bg-muted"
-                    >
-                      Verify by call
-                    </button>
+                    <>
+                      {callPhase === "idle" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!phone.trim()) return;
+                            const raw = phone.replace(/[^+0-9]/g, "");
+                            setCallStartedAt(Date.now());
+                            setCallPhase("dialing");
+                            wasHiddenDuringDial.current = false;
+                            let attempted = false;
+                            try {
+                              window.location.href = `tel:${raw}`; // mobile browsers
+                              attempted = true;
+                            } catch {}
+                            if (!attempted) {
+                              try {
+                                const a = document.createElement("a");
+                                a.href = `tel:${raw}`;
+                                a.style.display = "none";
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(() => a.remove(), 800);
+                              } catch {}
+                            }
+                            // Fallback: if page never hides (desktop) enable confirm after short delay
+                            setTimeout(() => {
+                              if (
+                                document.visibilityState === "visible" &&
+                                callPhaseRef.current === "dialing" &&
+                                !wasHiddenDuringDial.current
+                              ) {
+                                setCallPhase("ready-confirm");
+                              }
+                            }, 4000);
+                          }}
+                          className="rounded-full border border-border px-3 py-1 hover:bg-muted"
+                        >
+                          Call number
+                        </button>
+                      )}
+                      {callPhase === "dialing" && (
+                        <>
+                          <span className="text-muted-foreground animate-pulse">
+                            Dialing… (return after answer)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCallPhase("idle");
+                              setCallStartedAt(null);
+                            }}
+                            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {callPhase === "ready-confirm" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPhoneVerified(true);
+                              setPhoneVerifiedAt(Date.now());
+                              push({
+                                message: "Phone verified after call.",
+                                variant: "success",
+                              });
+                            }}
+                            className="rounded-full border border-border px-3 py-1 hover:bg-muted"
+                          >
+                            Confirm answered
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCallPhase("idle");
+                              setCallStartedAt(null);
+                            }}
+                            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                          >
+                            Retry
+                          </button>
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               ) : null}
@@ -541,9 +592,23 @@ export default function HandoverClient() {
           {/* Photos capture/upload (require at least 3) */}
           <div className="mt-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-foreground">
-                Photos (min. 3)
-              </h3>
+              <div>
+                <h3 className="text-base font-semibold text-foreground">
+                  Photos (required 4)
+                </h3>
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground max-w-sm">
+                  Order required:
+                  <span className="block">1. Client ID document</span>
+                  <span className="block">2. Client holding the ID</span>
+                  <span className="block">3. Clothing item</span>
+                  <span className="block">4. Distinctive mark / special label</span>
+                  {photos.length < 4 && photos.length >= 0 ? (
+                    <span className="block mt-1 text-accent">
+                      Next: {expectedPhotoLabels[photos.length] || "(optional)"}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {!cameraOpen ? (
                   <button
@@ -674,25 +739,32 @@ export default function HandoverClient() {
 
             {photos.length > 0 ? (
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {photos.map((src, i) => (
-                  <div
-                    key={i}
-                    className="relative rounded-lg overflow-hidden border border-border h-32"
-                  >
-                    <Image
-                      src={src}
-                      alt={`photo-${i}`}
-                      fill
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
+                {photos.map((src, i) => {
+                  const label = expectedPhotoLabels[i];
+                  return (
+                    <div
+                      key={i}
+                      className="relative rounded-lg overflow-hidden border border-border h-32"
+                    >
+                      <Image
+                        src={src}
+                        alt={`photo-${i}`}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        className="object-cover"
+                      />
+                      <div className="absolute top-0 left-0 bg-black/60 text-[10px] px-1.5 py-0.5 rounded-br text-white flex items-center gap-1">
+                        <span className="font-semibold">{i + 1}</span>
+                        {label ? <span>{label}</span> : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
-            {photos.length < 3 ? (
+            {photos.length < 4 ? (
               <p className="mt-2 text-xs text-red-600">
-                Please add at least 3 photos before saving.
+                Please add all 4 required photos before saving.
               </p>
             ) : null}
           </div>
