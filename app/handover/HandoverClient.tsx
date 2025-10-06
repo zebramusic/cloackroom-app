@@ -38,7 +38,37 @@ export default function HandoverClient() {
     // If user edits the phone after verifying, force re-verify
     setPhoneVerified(false);
     setPhoneVerifiedAt(null);
+    setCallPhase("idle");
+    setCallStartedAt(null);
   }, [phone]);
+
+  // Phone call verification state
+  const [callPhase, setCallPhase] = useState<
+    "idle" | "dialing" | "await-return" | "ready-confirm"
+  >("idle");
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const wasHiddenDuringDial = useRef(false);
+
+  // Listen for page visibility changes to infer user returning after attempting a call
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "hidden") {
+        if (callPhase === "dialing") wasHiddenDuringDial.current = true;
+        return;
+      }
+      // Returned to page
+      if (
+        callPhase === "dialing" &&
+        wasHiddenDuringDial.current &&
+        callStartedAt &&
+        Date.now() - callStartedAt > 1500 // minimal threshold
+      ) {
+        setCallPhase("ready-confirm");
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [callPhase, callStartedAt]);
 
   async function startCamera() {
     setCameraError(null);
