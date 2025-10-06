@@ -614,11 +614,7 @@ function buildHTML(
             r.phone
               ? `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(
                   r.phone
-                )}$${'{'}
-                  r.phoneVerified
-                    ? ' <span style=\\"color:green;font-size:10px;margin-left:4px\\">(Verified)</span>'
-                    : ''
-                ${'}'} </span></span>`
+                )}</span></span>`
               : ""
           }
           ${
