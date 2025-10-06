@@ -34,37 +34,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Testing
-
-### Unit / component tests
-
-Run the test suite (Vitest + Testing Library):
-
-```bash
-npm test
-```
-
-### Production-mode test run
-
-To surface any environment-specific issues (e.g. configuration relying on `NODE_ENV=production`) you can run:
-
-```bash
-npm run test:prod
-```
-
-This forces `NODE_ENV=production` while executing the same suite.
-
-### Coverage
-
-Generate coverage (lcov + text):
-
-```bash
-npx vitest run --coverage
-```
-
-### Notes
-
-- Tailwind PostCSS plugin is disabled during tests to avoid configuration issues.
-- Some browser APIs (mediaDevices, next/image, routing) are mocked in `vitest.setup.ts`.
-- Add additional tests under `app/**/__tests__/*` following the existing patterns.
