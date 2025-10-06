@@ -39,6 +39,41 @@ export default function HandoverClient() {
     "Clothing item",
     "Distinctive mark on clothing",
   ];
+  const expectedPhotoDetails: { label: string; tips: string[] }[] = [
+    {
+      label: "Client ID document",
+      tips: [
+        "Entire ID visible (all 4 edges)",
+        "Readable name & number (avoid glare)",
+        "No fingers covering key data",
+      ],
+    },
+    {
+      label: "Client holding the ID",
+      tips: [
+        "Client face + ID in frame",
+        "ID text roughly readable",
+        "Neutral lighting, no sunglasses",
+      ],
+    },
+    {
+      label: "Clothing item",
+      tips: [
+        "Full item laid out or held",
+        "Show color & general condition",
+        "Avoid background clutter",
+      ],
+    },
+    {
+      label: "Distinctive mark / label",
+      tips: [
+        "Close-up, sharply focused",
+        "Show unique feature (label, tear, pattern)",
+        "Fill most of the frame with the mark",
+      ],
+    },
+  ];
+  const [activePhotoSlot, setActivePhotoSlot] = useState<number | null>(null);
 
   // Reset manual verification if phone number is altered after verification
   useEffect(() => {
@@ -589,25 +624,79 @@ export default function HandoverClient() {
               placeholder="Marca, modelul, seria, culoarea, starea etc."
             />
           </div>
-          {/* Photos capture/upload (require at least 3) */}
+          {/* Photos capture/upload (require ordered 4) */}
           <div className="mt-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-semibold text-foreground">
                   Photos (required 4)
                 </h3>
-                <p className="mt-1 text-[11px] leading-snug text-muted-foreground max-w-sm">
-                  Order required:
-                  <span className="block">1. Client ID document</span>
-                  <span className="block">2. Client holding the ID</span>
-                  <span className="block">3. Clothing item</span>
-                  <span className="block">4. Distinctive mark / special label</span>
-                  {photos.length < 4 && photos.length >= 0 ? (
-                    <span className="block mt-1 text-accent">
-                      Next: {expectedPhotoLabels[photos.length] || "(optional)"}
-                    </span>
-                  ) : null}
-                </p>
+                <div className="mt-1 space-y-2 text-[11px] leading-tight text-muted-foreground max-w-lg">
+                  {expectedPhotoDetails.map((slot, i) => {
+                    const done = photos[i];
+                    const next = photos.length === i;
+                    return (
+                      <div
+                        key={slot.label}
+                        className={`rounded-md border px-2 py-1.5 ${
+                          done
+                            ? "border-green-600/40 bg-green-600/5"
+                            : next
+                            ? "border-accent/50 bg-accent/5"
+                            : photos.length > i
+                            ? "border-green-600/40 bg-green-600/5"
+                            : "border-border bg-muted/30"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${done ? "bg-green-600 text-white" : next ? "bg-accent text-accent-foreground" : "bg-muted text-foreground"}`}>{i + 1}</span>
+                          <span className="font-medium">
+                            {slot.label}
+                            {done ? " – captured" : next ? " – capture now" : ""}
+                          </span>
+                          {done && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivePhotoSlot(i);
+                                if (!cameraOpen) void startCamera();
+                                push({
+                                  message: `Retake slot ${i + 1} (${slot.label})`,
+                                  variant: "info",
+                                });
+                              }}
+                              className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                            >
+                              Retake
+                            </button>
+                          )}
+                          {!done && next && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivePhotoSlot(i);
+                                if (!cameraOpen) void startCamera();
+                              }}
+                              className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                            >
+                              Select camera
+                            </button>
+                          )}
+                        </div>
+                        <ul className="mt-1 ml-7 list-disc space-y-0.5">
+                          {slot.tips.map((t) => (
+                            <li key={t}>{t}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                  {photos.length >= 4 && (
+                    <div className="text-[10px] pt-1 text-muted-foreground">
+                      Additional (optional) evidence photos may be added after the 4 required slots.
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {!cameraOpen ? (
@@ -663,7 +752,7 @@ export default function HandoverClient() {
                     Use
                   </button>
                 </div>
-                <label className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted cursor-pointer">
+                <label className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                   <input
                     type="file"
                     accept="image/*"
@@ -675,7 +764,16 @@ export default function HandoverClient() {
                       const reader = new FileReader();
                       reader.onload = () => {
                         if (typeof reader.result === "string") {
-                          setPhotos((arr) => [...arr, reader.result as string]);
+                          setPhotos((arr) => {
+                            // If still filling required slots, append only if it is the next slot
+                            if (arr.length < 4) {
+                              if (arr.length === 0 || arr.length === arr.filter(Boolean).length) {
+                                return [...arr, reader.result as string];
+                              }
+                              return arr; // out of order ignore
+                            }
+                            return [...arr, reader.result as string];
+                          });
                         }
                       };
                       reader.readAsDataURL(file);
@@ -716,7 +814,6 @@ export default function HandoverClient() {
                         c.height = rawH;
                         ctx.drawImage(v, 0, 0, rawW, rawH);
                       } else {
-                        // Rotate portrait to landscape (clockwise 90deg)
                         c.width = rawH;
                         c.height = rawW;
                         ctx.save();
@@ -726,11 +823,26 @@ export default function HandoverClient() {
                         ctx.restore();
                       }
                       const dataUrl = c.toDataURL("image/jpeg", 0.9);
-                      setPhotos((arr) => [...arr, dataUrl]);
+                      setPhotos((arr) => {
+                        if (activePhotoSlot != null) {
+                          const copy = [...arr];
+                          copy[activePhotoSlot] = dataUrl;
+                          // If capturing a slot beyond current length (should not happen), fill intervening with placeholders? We'll ignore.
+                          return copy;
+                        }
+                        // Normal flow: fill next slot or append additional
+                        if (arr.length < 4) return [...arr, dataUrl];
+                        return [...arr, dataUrl];
+                      });
+                      setActivePhotoSlot(null);
                     }}
                     className="inline-flex items-center rounded-full bg-accent text-accent-foreground px-4 py-2 text-sm font-medium shadow hover:opacity-95"
                   >
-                    Capture
+                    {activePhotoSlot != null && activePhotoSlot < 4
+                      ? `Capture slot ${activePhotoSlot + 1}`
+                      : photos.length < 4
+                      ? `Capture slot ${photos.length + 1}`
+                      : "Capture extra"}
                   </button>
                 </div>
                 <canvas ref={canvasRef} className="hidden" />
@@ -738,28 +850,92 @@ export default function HandoverClient() {
             ) : null}
 
             {photos.length > 0 ? (
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {photos.map((src, i) => {
-                  const label = expectedPhotoLabels[i];
-                  return (
-                    <div
-                      key={i}
-                      className="relative rounded-lg overflow-hidden border border-border h-32"
-                    >
-                      <Image
-                        src={src}
-                        alt={`photo-${i}`}
-                        fill
-                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                        className="object-cover"
-                      />
-                      <div className="absolute top-0 left-0 bg-black/60 text-[10px] px-1.5 py-0.5 rounded-br text-white flex items-center gap-1">
-                        <span className="font-semibold">{i + 1}</span>
-                        {label ? <span>{label}</span> : null}
+              <div className="mt-4 space-y-4">
+                {/* Required slots gallery */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {Array.from({ length: 4 }).map((_, i) => {
+                    const src = photos[i];
+                    const meta = expectedPhotoDetails[i];
+                    return (
+                      <div
+                        key={i}
+                        className={`relative rounded-lg border h-32 overflow-hidden flex items-center justify-center text-center text-[11px] p-2 ${src ? "border-green-600/50" : photos.length === i ? "border-accent" : "border-border bg-muted/30"}`}
+                      >
+                        {src ? (
+                          <>
+                            <Image
+                              src={src}
+                              alt={`slot-${i + 1}`}
+                              fill
+                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                              className="object-cover"
+                            />
+                            <div className="absolute top-0 left-0 bg-black/60 text-[10px] px-1.5 py-0.5 rounded-br text-white flex items-center gap-1">
+                              <span className="font-semibold">{i + 1}</span>
+                              <span>{meta.label}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivePhotoSlot(i);
+                                if (!cameraOpen) void startCamera();
+                              }}
+                              className="absolute bottom-1 right-1 text-[10px] rounded-full bg-black/60 text-white px-2 py-0.5 hover:bg-black/80"
+                            >
+                              Replace
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (photos.length !== i) return; // enforce order
+                              setActivePhotoSlot(i);
+                              if (!cameraOpen) void startCamera();
+                            }}
+                            className="flex flex-col items-center gap-1 text-foreground/70 hover:text-foreground"
+                          >
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-medium">
+                              {i + 1}
+                            </span>
+                            <span className="font-medium leading-tight">
+                              {meta.label}
+                            </span>
+                            <span className="text-[9px] leading-tight opacity-70">
+                              {meta.tips[0]}
+                            </span>
+                          </button>
+                        )}
                       </div>
+                    );
+                  })}
+                </div>
+                {photos.length > 4 && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
+                      Additional evidence
                     </div>
-                  );
-                })}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {photos.slice(4).map((src, i) => (
+                        <div
+                          key={i}
+                          className="relative rounded-lg overflow-hidden border border-border h-28"
+                        >
+                          <Image
+                            src={src}
+                            alt={`extra-${i}`}
+                            fill
+                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                            className="object-cover"
+                          />
+                          <div className="absolute top-0 left-0 bg-black/50 text-[10px] px-1.5 py-0.5 rounded-br text-white">
+                            +{i + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : null}
             {photos.length < 4 ? (
