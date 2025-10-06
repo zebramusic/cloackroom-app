@@ -15,8 +15,9 @@ export default function HandoverClient() {
   const [staff, setStaff] = useState("");
   const [notes, setNotes] = useState("");
   const [language, setLanguage] = useState<"ro" | "en">("ro");
-  const [q, setQ] = useState("");
-  const [items, setItems] = useState<HandoverReport[]>([]);
+  // Removed unused search/list state to satisfy production lint; restore if list UI returns
+  // const [q, setQ] = useState("");
+  // const [items, setItems] = useState<HandoverReport[]>([]);
   const coatRef = useRef<HTMLInputElement>(null);
   const [me, setMe] = useState<{ fullName: string; type?: string } | null>(
     null
@@ -33,12 +34,7 @@ export default function HandoverClient() {
     undefined
   );
   // Expected first four photos order guidance
-  const expectedPhotoLabels = [
-    "Client ID document",
-    "Client with ID",
-    "Clothing item",
-    "Distinctive mark on clothing",
-  ];
+  // expectedPhotoLabels not directly used (labels derive from expectedPhotoDetails)
   const expectedPhotoDetails: { label: string; tips: string[] }[] = [
     {
       label: "Client ID document",
@@ -195,9 +191,17 @@ export default function HandoverClient() {
       stream?.getTracks().forEach((tr) => tr.stop());
       setStream(s);
       if (videoRef.current) {
-        (videoRef.current as any).srcObject = s;
+        const el = videoRef.current as HTMLVideoElement & {
+          srcObject?: MediaStream;
+        };
         try {
-          await videoRef.current.play();
+          if ('srcObject' in el) {
+            el.srcObject = s;
+          } else {
+            // @ts-ignore legacy fallback
+            el.src = URL.createObjectURL(s);
+          }
+          await el.play();
         } catch (e) {
           console.error(e);
           setCameraError(
@@ -220,11 +224,9 @@ export default function HandoverClient() {
     }
   }
 
-  // Initial focus, fetch list, and prime devices; devicechange listener
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Initial focus and device enumeration (list fetching removed for now)
   useEffect(() => {
     coatRef.current?.focus();
-    void fetchList("");
     void refreshDevices();
     // fetch current staff user
     void fetch("/api/auth/me", { cache: "no-store" })
@@ -248,16 +250,11 @@ export default function HandoverClient() {
 
   useEffect(() => {
     if (cameraOpen) void startCamera();
+    // Intentionally excluding startCamera from deps to avoid recreation loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDeviceId]);
+  }, [selectedDeviceId, cameraOpen]);
 
-  async function fetchList(query: string) {
-    const res = await fetch(`/api/handover?q=${encodeURIComponent(query)}`, {
-      cache: "no-store",
-    });
-    const json = (await res.json()) as { items: HandoverReport[] };
-    setItems(json.items);
-  }
+  // fetchList removed (no list UI active). Reintroduce if browsing past handovers client-side.
 
   async function submit() {
     if (!coatNumber.trim() || !fullName.trim()) return;
@@ -297,7 +294,7 @@ export default function HandoverClient() {
       setStaff("");
       setNotes("");
       setPhotos([]);
-      await fetchList("");
+  // Listing refresh skipped (list UI not present)
       try {
         sessionStorage.setItem(`handover:${id}`, JSON.stringify(payload));
       } catch {}
@@ -311,49 +308,7 @@ export default function HandoverClient() {
     }
   }
 
-  function printReport(r: HandoverReport) {
-    try {
-      sessionStorage.setItem(`handover:${r.id}`, JSON.stringify(r));
-    } catch {}
-    window.open(
-      `/private/handover/print/${encodeURIComponent(r.id)}?open=pdf&lang=${
-        r.language || "ro"
-      }`,
-      "_blank",
-      "noopener,noreferrer"
-    );
-  }
-
-  async function remove(id: string) {
-    const proceed = confirm(
-      "Delete this handover report? This action cannot be undone."
-    );
-    if (!proceed) return;
-    try {
-      await fetch(`/api/handover?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
-    } catch (e) {
-      console.error(e);
-      push({
-        message: "Failed to delete report. Please try again.",
-        variant: "error",
-      });
-    } finally {
-      await fetchList(q);
-    }
-  }
-
-  async function addSignedDoc(r: HandoverReport, file: File) {
-    // Compress image to reasonable size
-    const dataUrl = await fileToJpegDataUrl(file, 1600, 0.85);
-    await fetch(`/api/handover`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: r.id, signedDoc: dataUrl }),
-    });
-    await fetchList(q);
-  }
+  // Unused helper functions (print/delete/update) removed to satisfy lint; restore if UI adds management actions.
 
   function fileToJpegDataUrl(
     file: File,
