@@ -634,8 +634,8 @@ export default function HandoverClient() {
           </div>
           {/* Photos capture/upload (require ordered 4) */}
           <div className="mt-6">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <div className="flex-1 min-w-0">
                 <h3 className="text-base font-semibold text-foreground">
                   Photos (required 4)
                 </h3>
@@ -723,7 +723,7 @@ export default function HandoverClient() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap items-start gap-2 w-full sm:w-auto sm:self-start">
                 {!cameraOpen ? (
                   <button
                     type="button"
@@ -742,13 +742,13 @@ export default function HandoverClient() {
                   </button>
                 )}
                 {/* Camera device selector */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                   <select
                     value={selectedDeviceId || ""}
                     onChange={(e) =>
                       setSelectedDeviceId(e.target.value || undefined)
                     }
-                    className="rounded-full border border-border bg-background px-3 py-1 text-sm min-w-40"
+                    className="rounded-full border border-border bg-background px-3 py-1 text-sm w-full sm:min-w-40 flex-1 max-w-full"
                     aria-label="Camera device"
                   >
                     {videoDevices.length === 0 ? (
@@ -777,7 +777,7 @@ export default function HandoverClient() {
                     Use
                   </button>
                 </div>
-                <label className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                <label className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed w-full sm:w-auto">
                   <input
                     type="file"
                     accept="image/*"
