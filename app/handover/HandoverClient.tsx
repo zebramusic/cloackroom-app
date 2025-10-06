@@ -195,10 +195,10 @@ export default function HandoverClient() {
           srcObject?: MediaStream;
         };
         try {
-          if ('srcObject' in el) {
+          if ("srcObject" in el) {
             el.srcObject = s;
           } else {
-            // @ts-ignore legacy fallback
+            // @ts-expect-error legacy fallback for very old browsers without srcObject
             el.src = URL.createObjectURL(s);
           }
           await el.play();
@@ -294,7 +294,7 @@ export default function HandoverClient() {
       setStaff("");
       setNotes("");
       setPhotos([]);
-  // Listing refresh skipped (list UI not present)
+      // Listing refresh skipped (list UI not present)
       try {
         sessionStorage.setItem(`handover:${id}`, JSON.stringify(payload));
       } catch {}
@@ -310,46 +310,7 @@ export default function HandoverClient() {
 
   // Unused helper functions (print/delete/update) removed to satisfy lint; restore if UI adds management actions.
 
-  function fileToJpegDataUrl(
-    file: File,
-    maxW: number,
-    quality: number
-  ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result !== "string") {
-          reject(new Error("Bad file result"));
-          return;
-        }
-        const img = document.createElement("img");
-        img.onload = () => {
-          try {
-            const scale = Math.min(1, maxW / img.width);
-            const w = Math.round(img.width * scale);
-            const h = Math.round(img.height * scale);
-            const canvas = document.createElement("canvas");
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) {
-              resolve(reader.result as string);
-              return;
-            }
-            ctx.drawImage(img, 0, 0, w, h);
-            const out = canvas.toDataURL("image/jpeg", quality);
-            resolve(out);
-          } catch (e) {
-            resolve(reader.result as string);
-          }
-        };
-        img.onerror = () => reject(new Error("Image load failed"));
-        img.src = reader.result as string;
-      };
-      reader.onerror = () => reject(new Error("File read error"));
-      reader.readAsDataURL(file);
-    });
-  }
+  // Removed unused fileToJpegDataUrl helper (no signed doc upload UI).
 
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
