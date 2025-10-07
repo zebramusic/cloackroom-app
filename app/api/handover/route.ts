@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const name = (searchParams.get("name") || "").trim();
   const phone = (searchParams.get("phone") || "").trim();
   const eventId = (searchParams.get("eventId") || "").trim();
+  const eventName = (searchParams.get("eventName") || "").trim();
 
   // Build dynamic filter conditions; empty means no filter for that field
   const db = await getDb();
@@ -20,6 +21,8 @@ export async function GET(req: NextRequest) {
     const col = db.collection<HandoverReport>("handovers");
     const and: any[] = [];
     if (eventId) and.push({ eventId });
+    if (eventName)
+      and.push({ eventName: { $regex: eventName, $options: "i" } });
     if (coat) and.push({ coatNumber: { $regex: coat, $options: "i" } });
     if (name) and.push({ fullName: { $regex: name, $options: "i" } });
     if (phone) and.push({ phone: { $regex: phone, $options: "i" } });
@@ -49,6 +52,11 @@ export async function GET(req: NextRequest) {
   const items = Array.from(store.values())
     .filter((r) => {
       if (eventId && r.eventId !== eventId) return false;
+      if (
+        eventName &&
+        !(r.eventName || "").toLowerCase().includes(eventName.toLowerCase())
+      )
+        return false;
       if (coatL && !r.coatNumber.toLowerCase().includes(coatL)) return false;
       if (nameL && !r.fullName.toLowerCase().includes(nameL)) return false;
       if (phoneL && !(r.phone || "").toLowerCase().includes(phoneL)) return false;
