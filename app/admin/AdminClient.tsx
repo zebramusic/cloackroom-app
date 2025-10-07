@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
 import type { LostClaim } from "@/app/models/lost";
+import type { Event } from "@/app/models/event";
+import { isEventActive } from "@/app/models/event";
 
 type Health = {
   ok: boolean;
@@ -15,6 +17,7 @@ export default function AdminClient() {
   const [lost, setLost] = useState<LostClaim[] | null>(null);
   const [staffUsers, setStaffUsers] = useState<number | null>(null);
   const [adminUsers, setAdminUsers] = useState<number | null>(null);
+  const [events, setEvents] = useState<Event[] | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -47,6 +50,12 @@ export default function AdminClient() {
           (r) => r.json()
         );
         setAdminUsers(Array.isArray(ad.items) ? ad.items.length : 0);
+      } catch {}
+      try {
+        const ev = await fetch("/api/events", { cache: "no-store" }).then((r) =>
+          r.json()
+        );
+        setEvents(Array.isArray(ev.items) ? (ev.items as Event[]) : []);
       } catch {}
     })();
   }, []);
@@ -137,6 +146,25 @@ export default function AdminClient() {
                 Manage
               </Link>
             </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="text-sm text-muted-foreground">Events</div>
+          <div className="mt-1 text-xl font-semibold flex items-baseline gap-2">
+            {events ? events.length : "—"}
+            {events && (
+              <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                {events.filter((e) => isEventActive(e)).length} active
+              </span>
+            )}
+          </div>
+          <div className="mt-2">
+            <Link
+              href="/private/admin/events"
+              className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted inline-block"
+            >
+              Manage Events
+            </Link>
           </div>
         </div>
       </div>

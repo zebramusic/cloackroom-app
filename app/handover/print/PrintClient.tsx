@@ -564,28 +564,28 @@ function buildHTML(
 
   return `
     <div class="layout-stack">\n      <div class="text-section">\n        <div class="header header-inline">\n          <span class="company">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class="sep">|</span>\n          <span class="muted small">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class="sep">|</span>\n          <span class="muted small">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class="row row-duo">\n          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
-            r.createdAt
-          ).toLocaleString()}</strong></span>\n          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
-            r.coatNumber
-          )}</strong></span>\n        </div>\n        <div class="row row-multi">\n          <span class="field"><span class="label">Nume / Name</span><strong>${esc(
-            r.fullName
-          )}</strong></span>\n          ${phoneField}\n          ${
-            r.email
-              ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
-                  r.email
-                )}</span></span>`
-              : ""
-          }\n        </div>\n        ${
-          r.eventName || r.eventId
-            ? `<div class=\"row\"><span class=\"label\">Eveniment / Event</span><span>${esc(
-                r.eventName || r.eventId || ""
-              )}</span></div>`
-            : ""
-        }\n        ${
+    r.createdAt
+  ).toLocaleString()}</strong></span>\n          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
+    r.coatNumber
+  )}</strong></span>\n        </div>\n        <div class="row row-multi">\n          <span class="field"><span class="label">Nume / Name</span><strong>${esc(
+    r.fullName
+  )}</strong></span>\n          ${phoneField}\n          ${
+    r.email
+      ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
+          r.email
+        )}</span></span>`
+      : ""
+  }\n        </div>\n        ${
+    r.eventName || r.eventId
+      ? `<div class=\"row\"><span class=\"label\">Eveniment / Event</span><span>${esc(
+          r.eventName || r.eventId || ""
+        )}</span></div>`
+      : ""
+  }\n        ${
+    r.staff
+      ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
           r.staff
-            ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
-                r.staff
-              )}</span></div>`
-            : ""
-        }\n        <div class="box decl-box">${declarationBlock}</div>\n        <div class="signature-line"><span class="sig-label">Semnătură / Signature</span><div class="sig-box"></div></div>\n      </div>\n      <div class="photos-section">${photos}</div>\n    </div>\n  `;
+        )}</span></div>`
+      : ""
+  }\n        <div class="box decl-box">${declarationBlock}</div>\n        <div class="signature-line"><span class="sig-label">Semnătură / Signature</span><div class="sig-box"></div></div>\n      </div>\n      <div class="photos-section">${photos}</div>\n    </div>\n  `;
 }

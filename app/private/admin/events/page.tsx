@@ -6,7 +6,7 @@ import { isEventActive } from "@/app/models/event";
 interface DraftEvent {
   name: string;
   startsAt: string; // ISO local input
-  endsAt: string;   // ISO local input
+  endsAt: string; // ISO local input
 }
 
 export default function AdminEventsPage() {
@@ -27,7 +27,9 @@ export default function AdminEventsPage() {
 
   function toLocalInputValue(d: Date) {
     const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+      d.getDate()
+    )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   function parseLocal(dt: string): number | null {
@@ -129,7 +131,12 @@ export default function AdminEventsPage() {
       const res = await fetch("/api/events", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: editingId, name: editDraft.name.trim(), startsAt, endsAt }),
+        body: JSON.stringify({
+          id: editingId,
+          name: editDraft.name.trim(),
+          startsAt,
+          endsAt,
+        }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -164,7 +171,8 @@ export default function AdminEventsPage() {
     <main className="mx-auto max-w-5xl px-4 sm:px-6 py-10">
       <h1 className="text-2xl font-bold text-foreground">Events</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Manage events (start/end are inclusive; active events influence handovers).
+        Manage events (start/end are inclusive; active events influence
+        handovers).
       </p>
 
       <section className="mt-8 rounded-2xl border border-border bg-card p-4">
@@ -173,7 +181,9 @@ export default function AdminEventsPage() {
         </h2>
         <div className="grid sm:grid-cols-4 gap-4">
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-foreground">Name</label>
+            <label className="block text-xs font-medium text-foreground">
+              Name
+            </label>
             <input
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
@@ -182,7 +192,9 @@ export default function AdminEventsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-foreground">Starts</label>
+            <label className="block text-xs font-medium text-foreground">
+              Starts
+            </label>
             <input
               type="datetime-local"
               value={draft.startsAt}
@@ -191,7 +203,9 @@ export default function AdminEventsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-foreground">Ends</label>
+            <label className="block text-xs font-medium text-foreground">
+              Ends
+            </label>
             <input
               type="datetime-local"
               value={draft.endsAt}
@@ -244,7 +258,10 @@ export default function AdminEventsPage() {
                   const active = isEventActive(ev, now);
                   const editing = editingId === ev.id;
                   return (
-                    <tr key={ev.id} className="border-b border-border/60 last:border-none">
+                    <tr
+                      key={ev.id}
+                      className="border-b border-border/60 last:border-none"
+                    >
                       <td className="py-2 pr-4 align-top">
                         {editing ? (
                           <input

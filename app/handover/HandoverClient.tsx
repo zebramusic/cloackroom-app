@@ -263,7 +263,7 @@ export default function HandoverClient() {
         const json = (await res.json()) as { items?: Event[] };
         if (!cancelled && Array.isArray(json.items)) {
           const all = json.items;
-            // sort by startsAt ascending for deterministic ordering
+          // sort by startsAt ascending for deterministic ordering
           all.sort((a, b) => a.startsAt - b.startsAt);
           setEvents(all);
           const now = Date.now();
@@ -389,9 +389,7 @@ export default function HandoverClient() {
               ) : (
                 <select
                   value={selectedEventId || ""}
-                  onChange={(e) =>
-                    setSelectedEventId(e.target.value || null)
-                  }
+                  onChange={(e) => setSelectedEventId(e.target.value || null)}
                   className="text-xs rounded-full border border-border bg-background px-2 py-1"
                 >
                   <option value="">Select event…</option>
