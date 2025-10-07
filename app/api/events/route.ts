@@ -71,3 +71,40 @@ export async function PATCH(req: NextRequest) {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    // Support id from body or search param ?id=
+    let id: string | undefined;
+    const url = new URL(req.url);
+    id = url.searchParams.get("id") || undefined;
+    if (!id) {
+      try {
+        const body = (await req.json()) as { id?: string };
+        id = body.id;
+      } catch {
+        /* ignore parse */
+      }
+    }
+    if (!id) {
+      return new Response(JSON.stringify({ error: "Missing id" }), {
+        status: 400,
+      });
+    }
+    const idx = events.findIndex((e) => e.id === id);
+    if (idx === -1) {
+      return new Response(JSON.stringify({ error: "Not found" }), {
+        status: 404,
+      });
+    }
+    const removed = events.splice(idx, 1)[0];
+    return new Response(JSON.stringify({ ok: true, removed }), {
+      headers: { "content-type": "application/json" },
+    });
+  } catch (e) {
+    console.error(e);
+    return new Response(JSON.stringify({ error: "Invalid request" }), {
+      status: 400,
+    });
+  }
+}
