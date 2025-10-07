@@ -20,7 +20,7 @@ export default function HandoversClient() {
       if (coat.trim()) usp.set("coat", coat.trim());
       if (name.trim()) usp.set("name", name.trim());
       if (phone.trim()) usp.set("phone", phone.trim());
-  if (eventName.trim()) usp.set("eventName", eventName.trim());
+      if (eventName.trim()) usp.set("eventName", eventName.trim());
       const res = await fetch(`/api/handover?${usp.toString()}`, {
         cache: "no-store",
       });
