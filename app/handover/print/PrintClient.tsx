@@ -504,7 +504,7 @@ function buildHTML(
   const staffText = (r.staff && r.staff.trim()) || "(staff member)";
 
   const bodyRO = `
-    <h2 style=\"margin:0 0 6px;font-size:13px\">Declarație pe propria răspundere</h2>
+    <h2 style="margin:0 0 6px;font-size:13px">Declarație pe propria răspundere</h2>
     <p>Subsemnatul(a) <strong>${esc(
       r.fullName
     )}</strong>, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. <strong>${esc(
@@ -518,7 +518,7 @@ function buildHTML(
   `;
 
   const bodyEN = `
-    <h2 style=\"margin:8px 0 6px;font-size:13px\">Self-Declaration</h2>
+    <h2 style="margin:8px 0 6px;font-size:13px">Self-Declaration</h2>
     <p>I, <strong>${esc(
       r.fullName
     )}</strong>, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. <strong>${esc(
@@ -535,20 +535,20 @@ function buildHTML(
   const shown = imgs.slice(0, 4);
   const extraCount = Math.max(0, imgs.length - shown.length);
   const photos = shown.length
-    ? `<div class=\"photos-box box photos-count-${
+    ? `<div class="photos-box box photos-count-${
         shown.length
-      }\">\n        <div class=\"photos-heading\">Fotografii / Photos</div>\n        <div class=\"grid\">\n          ${shown
-        .map((p, i) => `<img src=\"${p}\" alt=\"photo-${i}\" />`)
+      }">\n        <div class="photos-heading">Fotografii / Photos</div>\n        <div class="grid">\n          ${shown
+        .map((p, i) => `<img src="${p}" alt="photo-${i}" />`)
         .join("")}\n        </div>\n        ${
         extraCount
-          ? `<div class=\"muted\" style=\"margin-top:6px\">+${extraCount} alte fotografii / more photos</div>`
+          ? `<div class="muted" style="margin-top:6px">+${extraCount} alte fotografii / more photos</div>`
           : ""
       }\n      </div>`
-    : `<div class=\"photos-box box no-photos\"><div class=\"muted\">(Fără fotografii / No photos)</div></div>`;
+    : `<div class="photos-box box no-photos"><div class="muted">(Fără fotografii / No photos)</div></div>`;
 
   let phoneField = "";
   if (r.phone) {
-    phoneField = `<span class=\"field\"><span class=\"label\">Telefon / Phone</span><span>${esc(
+    phoneField = `<span class="field"><span class="label">Telefon / Phone</span><span>${esc(
       r.phone
     )}`;
     if (r.phoneVerified) {
@@ -563,23 +563,29 @@ function buildHTML(
     lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
 
   return `
-    <div class=\"layout-stack\">\n      <div class=\"text-section\">\n        <div class=\"header header-inline\">\n          <span class=\"company\">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class=\"sep\">|</span>\n          <span class=\"muted small\">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class=\"row row-duo\">\n          <span class=\"field\"><span class=\"label\">Data / Date</span><strong>${new Date(
-    r.createdAt
-  ).toLocaleString()}</strong></span>\n          <span class=\"field\"><span class=\"label\">Tichet / Ticket</span><strong>${esc(
-    r.coatNumber
-  )}</strong></span>\n        </div>\n        <div class=\"row row-multi\">\n          <span class=\"field\"><span class=\"label\">Nume / Name</span><strong>${esc(
-    r.fullName
-  )}</strong></span>\n          ${phoneField}\n          ${
-    r.email
-      ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
-          r.email
-        )}</span></span>`
-      : ""
-  }\n        </div>\n        ${
-    r.staff
-      ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
+    <div class="layout-stack">\n      <div class="text-section">\n        <div class="header header-inline">\n          <span class="company">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class="sep">|</span>\n          <span class="muted small">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class="sep">|</span>\n          <span class="muted small">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class="row row-duo">\n          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
+            r.createdAt
+          ).toLocaleString()}</strong></span>\n          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
+            r.coatNumber
+          )}</strong></span>\n        </div>\n        <div class="row row-multi">\n          <span class="field"><span class="label">Nume / Name</span><strong>${esc(
+            r.fullName
+          )}</strong></span>\n          ${phoneField}\n          ${
+            r.email
+              ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
+                  r.email
+                )}</span></span>`
+              : ""
+          }\n        </div>\n        ${
+          r.eventName || r.eventId
+            ? `<div class=\"row\"><span class=\"label\">Eveniment / Event</span><span>${esc(
+                r.eventName || r.eventId || ""
+              )}</span></div>`
+            : ""
+        }\n        ${
           r.staff
-        )}</span></div>`
-      : ""
-  }\n        <div class=\"box decl-box\">${declarationBlock}</div>\n        <div class=\"signature-line\"><span class=\"sig-label\">Semnătură / Signature</span><div class=\"sig-box\"></div></div>\n      </div>\n      <div class=\"photos-section\">${photos}</div>\n    </div>\n  `;
+            ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
+                r.staff
+              )}</span></div>`
+            : ""
+        }\n        <div class="box decl-box">${declarationBlock}</div>\n        <div class="signature-line"><span class="sig-label">Semnătură / Signature</span><div class="sig-box"></div></div>\n      </div>\n      <div class="photos-section">${photos}</div>\n    </div>\n  `;
 }

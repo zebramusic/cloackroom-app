@@ -2,6 +2,9 @@ export interface HandoverReport {
   id: string; // handover_<timestamp>
   coatNumber: string; // the coat tag/number
   fullName: string;
+  // Event tagging (optional) – associates this handover with an active event
+  eventId?: string; // ID of the event active at creation
+  eventName?: string; // denormalized for quick print (snapshot of name)
   phone?: string;
   phoneVerified?: boolean; // manually confirmed via phone call
   phoneVerifiedAt?: number; // epoch ms when verified

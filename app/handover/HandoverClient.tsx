@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/app/private/toast/ToastContext";
 import Image from "next/image";
 import type { HandoverReport } from "@/app/models/handover";
+import type { Event } from "@/app/models/event";
+import { isEventActive } from "@/app/models/event";
 
 export default function HandoverClient() {
   const { push } = useToast();
@@ -15,6 +17,10 @@ export default function HandoverClient() {
   const [staff, setStaff] = useState("");
   const [notes, setNotes] = useState("");
   const [language, setLanguage] = useState<"ro" | "en">("ro");
+  // Events state
+  const [events, setEvents] = useState<Event[]>([]);
+  const [activeEvents, setActiveEvents] = useState<Event[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   // Removed unused search/list state to satisfy production lint; restore if list UI returns
   // const [q, setQ] = useState("");
   // const [items, setItems] = useState<HandoverReport[]>([]);
@@ -248,6 +254,45 @@ export default function HandoverClient() {
     };
   }, []);
 
+  // Fetch events & determine active ones
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEvents() {
+      try {
+        const res = await fetch("/api/events", { cache: "no-store" });
+        const json = (await res.json()) as { items?: Event[] };
+        if (!cancelled && Array.isArray(json.items)) {
+          const all = json.items;
+            // sort by startsAt ascending for deterministic ordering
+          all.sort((a, b) => a.startsAt - b.startsAt);
+          setEvents(all);
+          const now = Date.now();
+          const actives = all.filter((e) => isEventActive(e, now));
+          setActiveEvents(actives);
+          // Auto-select logic: if only one active event, select it
+          if (actives.length === 1) {
+            setSelectedEventId(actives[0].id);
+          } else if (actives.length > 1) {
+            // keep previous selection if still active; otherwise unset
+            setSelectedEventId((prev) =>
+              prev && actives.some((e) => e.id === prev) ? prev : null
+            );
+          } else {
+            setSelectedEventId(null);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    void loadEvents();
+    const interval = setInterval(loadEvents, 60_000); // refresh every minute in case of schedule changes
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
   useEffect(() => {
     if (cameraOpen) void startCamera();
     // Intentionally excluding startCamera from deps to avoid recreation loop.
@@ -267,6 +312,10 @@ export default function HandoverClient() {
         id,
         coatNumber: coatNumber.trim(),
         fullName: fullName.trim(),
+        eventId: selectedEventId || undefined,
+        eventName: selectedEventId
+          ? events.find((e) => e.id === selectedEventId)?.name
+          : undefined,
         phone: phone.trim() || undefined,
         phoneVerified: phone.trim() ? phoneVerified : undefined,
         phoneVerifiedAt: phoneVerifiedAt || undefined,
@@ -294,6 +343,7 @@ export default function HandoverClient() {
       setStaff("");
       setNotes("");
       setPhotos([]);
+      // keep selected event (do not reset) so multiple handovers during same event are tagged
       // Listing refresh skipped (list UI not present)
       try {
         sessionStorage.setItem(`handover:${id}`, JSON.stringify(payload));
@@ -324,6 +374,41 @@ export default function HandoverClient() {
 
       <div className="mt-6 grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-4">
+          {/* Event selection / status */}
+          <div className="mb-4 flex flex-col gap-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-medium text-foreground">Event</span>
+              {activeEvents.length === 0 ? (
+                <span className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                  No active event
+                </span>
+              ) : activeEvents.length === 1 ? (
+                <span className="text-xs rounded-full bg-accent text-accent-foreground px-2 py-0.5">
+                  {activeEvents[0].name}
+                </span>
+              ) : (
+                <select
+                  value={selectedEventId || ""}
+                  onChange={(e) =>
+                    setSelectedEventId(e.target.value || null)
+                  }
+                  className="text-xs rounded-full border border-border bg-background px-2 py-1"
+                >
+                  <option value="">Select event…</option>
+                  {activeEvents.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {selectedEventId && (
+              <div className="text-[10px] text-muted-foreground">
+                Tagged to event – will appear on print.
+              </div>
+            )}
+          </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground">
