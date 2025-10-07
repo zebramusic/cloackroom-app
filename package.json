@@ -6,8 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
-    "smoke": "node ./scripts/smoke.mjs"
+    "lint": "eslint"
   },
   "dependencies": {
     "mongodb": "^6.20.0",

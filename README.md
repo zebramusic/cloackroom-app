@@ -34,20 +34,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Production Smoke Test
-
-Run a minimal end-to-end production smoke (build + start + probe a few routes) locally or in CI:
-
-```bash
-npm run smoke
-```
-
-The script will:
-
-1. Build the app (`npm run build`).
-2. Start the production server on port 3000.
-3. Probe `/`, `/private/handover`, `/private/handovers`.
-4. Fail (exit 1) if the server doesn't become ready within ~15s or if any probe returns an error code outside 2xx–4xx.
-
-Adjust paths or add auth-aware probes in `scripts/smoke.mjs` as the application evolves.
