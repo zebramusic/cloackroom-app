@@ -1,17 +1,30 @@
 "use client";
 import { useEffect, useState } from "react";
+import type { Event } from "@/app/models/event";
+import { isEventActive } from "@/app/models/event";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
 
 export default function HandoversClient() {
   const [items, setItems] = useState<HandoverReport[] | null>(null);
   const [q, setQ] = useState("");
+  const [coat, setCoat] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [eventId, setEventId] = useState("");
+  const [events, setEvents] = useState<Event[] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function fetchList(query: string) {
+  async function fetchList(query?: string) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/handover?q=${encodeURIComponent(query)}`, {
+      const usp = new URLSearchParams();
+      if (query) usp.set("q", query);
+      if (coat.trim()) usp.set("coat", coat.trim());
+      if (name.trim()) usp.set("name", name.trim());
+      if (phone.trim()) usp.set("phone", phone.trim());
+      if (eventId) usp.set("eventId", eventId);
+      const res = await fetch(`/api/handover?${usp.toString()}`, {
         cache: "no-store",
       });
       const json = (await res.json()) as { items: HandoverReport[] };
@@ -25,7 +38,24 @@ export default function HandoversClient() {
 
   useEffect(() => {
     void fetchList("");
+    // load events for filter selection
+    void (async () => {
+      try {
+        const res = await fetch("/api/events", { cache: "no-store" });
+        const json = (await res.json()) as { items?: Event[] };
+        const arr = Array.isArray(json.items) ? json.items : [];
+        arr.sort((a, b) => a.startsAt - b.startsAt);
+        setEvents(arr);
+      } catch {}
+    })();
   }, []);
+
+  // Re-run fetch when field filters change (debounced minimal by synchronous grouping)
+  useEffect(() => {
+    const t = setTimeout(() => void fetchList(q), 200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coat, name, phone, eventId]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
@@ -49,26 +79,79 @@ export default function HandoversClient() {
         </div>
       </div>
 
-      <div className="mt-6 flex items-center gap-3 flex-wrap">
-        <input
-          value={q}
-          onChange={(e) => {
-            const val = e.target.value;
-            setQ(val);
-            void fetchList(val);
-          }}
-          placeholder="Search by coat number, name, phone, or staff"
-          className="w-full sm:w-80 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
-        />
-        {loading ? (
-          <span className="text-xs text-muted-foreground">Loading…</span>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            {items
-              ? `${items.length} result${items.length === 1 ? "" : "s"}`
-              : "—"}
-          </span>
-        )}
+      <div className="mt-6 grid gap-3 w-full">
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            value={q}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQ(val);
+              void fetchList(val);
+            }}
+            placeholder="Quick search (coat, name, phone, event)"
+            className="w-full sm:w-64 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
+          />
+          <input
+            value={coat}
+            onChange={(e) => setCoat(e.target.value)}
+            placeholder="Coat #"
+            className="w-28 rounded-full border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
+          />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name"
+            className="w-40 rounded-full border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
+          />
+            <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Phone"
+            className="w-40 rounded-full border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
+          />
+          <select
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value)}
+            className="w-48 rounded-full border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
+          >
+            <option value="">All events</option>
+            {events?.map((ev) => {
+              const status = isEventActive(ev)
+                ? "active"
+                : ev.startsAt > Date.now()
+                ? "upcoming"
+                : "past";
+              return (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} ({status})
+                </option>
+              );
+            })}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setCoat("");
+              setName("");
+              setPhone("");
+              setEventId("");
+              setQ("");
+              void fetchList("");
+            }}
+            className="text-xs rounded-full border border-border px-3 py-1 hover:bg-muted"
+          >
+            Reset
+          </button>
+          {loading ? (
+            <span className="text-xs text-muted-foreground">Loading…</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {items
+                ? `${items.length} result${items.length === 1 ? "" : "s"}`
+                : "—"}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 grid gap-3">
