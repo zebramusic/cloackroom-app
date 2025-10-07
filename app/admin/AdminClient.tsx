@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
-import type { LostClaim } from "@/app/models/lost";
 import type { Event } from "@/app/models/event";
 import { isEventActive } from "@/app/models/event";
 
@@ -14,7 +13,6 @@ type Health = {
 export default function AdminClient() {
   const [health, setHealth] = useState<Health | null>(null);
   const [handovers, setHandovers] = useState<HandoverReport[] | null>(null);
-  const [lost, setLost] = useState<LostClaim[] | null>(null);
   const [staffUsers, setStaffUsers] = useState<number | null>(null);
   const [adminUsers, setAdminUsers] = useState<number | null>(null);
   const [events, setEvents] = useState<Event[] | null>(null);
@@ -32,12 +30,6 @@ export default function AdminClient() {
           (r) => r.json()
         );
         setHandovers((hs.items || []) as HandoverReport[]);
-      } catch {}
-      try {
-        const ls = await fetch("/api/lost?q=", { cache: "no-store" }).then(
-          (r) => r.json()
-        );
-        setLost((ls.items || []) as LostClaim[]);
       } catch {}
       try {
         const st = await fetch("/api/staff?q=", { cache: "no-store" }).then(
@@ -102,20 +94,6 @@ export default function AdminClient() {
           </div>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Lost & Found</div>
-          <div className="mt-1 text-xl font-semibold">
-            {lost ? lost.length : "—"}
-          </div>
-          <div className="mt-2">
-            <Link
-              href="/lost"
-              className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted inline-block"
-            >
-              Open Lost & Found
-            </Link>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
           <div className="text-sm text-muted-foreground">Users</div>
           <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
             <div>
@@ -169,39 +147,7 @@ export default function AdminClient() {
         </div>
       </div>
 
-      <div className="mt-6">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Recent Lost Claims</h2>
-            <Link
-              href="/lost"
-              className="text-sm text-accent underline underline-offset-2"
-            >
-              View all
-            </Link>
-          </div>
-          <div className="mt-3 grid gap-2">
-            {lost?.slice(0, 8).map((c) => (
-              <div
-                key={c.id}
-                className="rounded-xl border border-border bg-background p-3"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="font-medium">{c.fullName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(c.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                  <span className="text-xs rounded-full border border-border px-2 py-1 bg-muted/40">
-                    {c.resolved ? "Resolved" : "Open"}
-                  </span>
-                </div>
-              </div>
-            )) || <div className="text-sm text-muted-foreground">No data.</div>}
-          </div>
-        </div>
-      </div>
+      {/* Lost & Found section removed */}
     </main>
   );
 }
