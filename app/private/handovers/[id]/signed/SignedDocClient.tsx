@@ -73,8 +73,8 @@ export default function SignedDocClient({
       const optimized = await compressCanvasToMax(canvas, 300 * 1024);
       await persistSigned(optimized);
       stopCamera();
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
       push({ message: "Capture failed.", variant: "error" });
     } finally {
       setUploading(false);

@@ -41,7 +41,8 @@ export default function AdminsPage() {
   }
   useEffect(() => {
     void load();
-  }, []);
+    // load depends on q; re-run when q changes for live filtering
+  }, [q]);
   // Guard: only admins allowed
   useEffect(() => {
     void fetch("/api/auth/me", { cache: "no-store" })

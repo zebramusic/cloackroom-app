@@ -279,8 +279,7 @@ export default function HandoverClient() {
   // Re-start camera when device changes
   useEffect(() => {
     if (cameraOpen) void startCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDeviceId, cameraOpen]);
+  }, [selectedDeviceId, cameraOpen, startCamera]);
 
   async function submit() {
     if (!coatNumber.trim() || !fullName.trim()) return;

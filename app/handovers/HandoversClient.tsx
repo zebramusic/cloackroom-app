@@ -35,14 +35,13 @@ export default function HandoversClient() {
 
   useEffect(() => {
     void fetchList("");
-  }, []);
+  }, []); // initial load only
 
   // Re-run fetch when field filters change (debounced minimal by synchronous grouping)
   useEffect(() => {
     const t = setTimeout(() => void fetchList(q), 200);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coat, name, phone, eventName]);
+  }, [q, coat, name, phone, eventName]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-10">

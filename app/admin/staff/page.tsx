@@ -36,7 +36,7 @@ export default function StaffAdminPage() {
   }
   useEffect(() => {
     void load();
-  }, []);
+  }, [q]);
   // Guard: only admins allowed
   useEffect(() => {
     void fetch("/api/auth/me", { cache: "no-store" })
@@ -70,7 +70,7 @@ export default function StaffAdminPage() {
       }
       setForm({ fullName: "", email: "", password: "", isAuthorized: false });
       await load();
-    } catch (e) {
+    } catch {
       setError("Network error");
     }
   }

@@ -134,7 +134,7 @@ export default function PrintClient({ id }: Props) {
     } finally {
       contentRef.current?.classList.remove("pdf-mode");
     }
-  }, [data]);
+  }, [data, isJsPDF]);
 
   // Detect mode from query param and trigger appropriate action
   useEffect(() => {

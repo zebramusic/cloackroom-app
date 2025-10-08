@@ -15,5 +15,5 @@ export async function GET() {
     .sort({ createdAt: -1 })
     .limit(50)
     .toArray();
-  return NextResponse.json({ items: admins.map(({ passwordHash, ...r }) => r) });
+  return NextResponse.json({ items: admins.map(({ passwordHash: _pw, ...r }) => r) });
 }

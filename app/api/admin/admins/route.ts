@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     .sort({ createdAt: -1 })
     .limit(200)
     .toArray();
-  return NextResponse.json({ items: items.map(({ passwordHash, ...r }) => r) });
+  return NextResponse.json({ items: items.map(({ passwordHash: _pw, ...r }) => r) });
 }
 
 // POST create
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     createdAt: Date.now(),
   };
   await db.collection<AdminUser>("admins").updateOne({ id: user.id }, { $set: user }, { upsert: true });
-  const { passwordHash, ...safe } = user;
+  const { passwordHash: _pw, ...safe } = user;
   return NextResponse.json(safe, { status: 201 });
 }
 
@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest) {
   await db.collection<AdminUser>("admins").updateOne({ id: body.id }, { $set: update });
   const updated = await db.collection<AdminUser>("admins").findOne({ id: body.id });
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { passwordHash, ...safe } = updated as AdminUser;
+  const { passwordHash: _pw2, ...safe } = updated as AdminUser;
   return NextResponse.json(safe);
 }
 

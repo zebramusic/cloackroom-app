@@ -10,7 +10,7 @@ export default function PrivateNav() {
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const firstFocusable = useRef<HTMLButtonElement | null>(null);
+  // removed unused firstFocusable ref
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
