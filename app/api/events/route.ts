@@ -3,7 +3,7 @@ import type { Event } from "@/app/models/event";
 
 // In-memory store (placeholder). Replace with persistent storage (DB) in production.
 // NOTE: This will reset on each serverless cold start / deployment.
-let events: Event[] = [];
+const events: Event[] = [];
 
 function sortEvents() {
   events.sort((a, b) => a.startsAt - b.startsAt);

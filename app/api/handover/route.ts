@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
   const db = await getDb();
   if (db) {
     const col = db.collection<HandoverReport>("handovers");
-    const and: any[] = [];
+  // Build MongoDB filter parts with explicit typing to avoid any
+  const and: Record<string, unknown>[] = [];
     if (eventId) and.push({ eventId });
     if (eventName)
       and.push({ eventName: { $regex: eventName, $options: "i" } });
