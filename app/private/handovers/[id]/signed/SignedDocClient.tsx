@@ -45,11 +45,12 @@ export default function SignedDocClient({
         videoRef.current.srcObject = s as MediaStream;
         try {
           const pr = videoRef.current.play();
-            if (pr && typeof (pr as Promise<void>).then === "function") {
-              await (pr as Promise<void>).catch((err) => {
-                if ((err as DOMException)?.name !== "AbortError") console.error(err);
-              });
-            }
+          if (pr && typeof (pr as Promise<void>).then === "function") {
+            await (pr as Promise<void>).catch((err) => {
+              if ((err as DOMException)?.name !== "AbortError")
+                console.error(err);
+            });
+          }
         } catch (err) {
           if ((err as DOMException)?.name !== "AbortError") console.error(err);
         }

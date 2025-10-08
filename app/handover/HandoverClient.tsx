@@ -190,7 +190,9 @@ export default function HandoverClient() {
       stream?.getTracks().forEach((tr) => tr.stop());
       setStream(s);
       if (videoRef.current) {
-        const el = videoRef.current as HTMLVideoElement & { srcObject?: MediaStream };
+        const el = videoRef.current as HTMLVideoElement & {
+          srcObject?: MediaStream;
+        };
         try {
           if ("srcObject" in el) {
             // Clear first to reduce play() AbortError risk
