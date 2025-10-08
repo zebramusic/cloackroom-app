@@ -14,6 +14,7 @@ export default function Home() {
 
       <Features />
       <Partners />
+      <p>h</p>ello
       <FAQ />
       <Contact />
       <Footer />
