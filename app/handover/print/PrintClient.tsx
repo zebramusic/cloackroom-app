@@ -270,6 +270,18 @@ const styles = `
   @page { size: A4 portrait; margin: 10mm; }
   body, .print-light { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#fff; color:#111; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size:13px; }
   .print-light { line-height:1.45; }
+  /* Single-page enforced grid layout */
+  .single-page-grid{ display:grid; grid-template-columns:1fr 210px; gap:12px; align-items:start; }
+  .single-page-grid.narrow-cols{ grid-template-columns:1fr 180px; }
+  .single-page-grid .text-section{ display:flex; flex-direction:column; min-width:0; }
+  .single-page-grid .photos-section{ display:flex; flex-direction:column; gap:6px; }
+  .single-page-grid .photos-heading{ margin:0 0 4px; }
+  .single-page-grid .photos-box .grid{ display:grid; gap:6px; grid-template-columns:1fr; }
+  .single-page-grid .photos-box .grid img{ aspect-ratio:4/3; width:100%; height:auto; object-fit:cover; border:1px solid #ccc; border-radius:4px; }
+  .single-page-grid .muted{ font-size:11px; }
+  /* Auto-scale helper when overflow detected */
+  .auto-scale{ transform-origin:top left; }
+  @media print { .auto-scale{ transform-origin:top left !important; } }
   .layout-two{ display:none; }
   .layout-stack{ display:flex; flex-direction:column; gap:18px; width:100%; }
   .layout-stack .text-section{ display:flex; flex-direction:column; }
@@ -563,7 +575,7 @@ function buildHTML(
     lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
 
   return `
-    <div class="layout-stack">\n      <div class="text-section">\n        <div class="header header-inline">\n          <span class="company">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class="sep">|</span>\n          <span class="muted small">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class="sep">|</span>\n          <span class="muted small">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class="row row-duo">\n          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
+    <div class="single-page-grid">\n      <div class="text-section">\n        <div class="header header-inline">\n          <span class="company">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class="sep">|</span>\n          <span class="muted small">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class="sep">|</span>\n          <span class="muted small">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class="row row-duo">\n          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
     r.createdAt
   ).toLocaleString()}</strong></span>\n          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
     r.coatNumber

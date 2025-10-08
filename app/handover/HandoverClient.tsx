@@ -6,6 +6,48 @@ import type { HandoverReport } from "@/app/models/handover";
 import type { Event } from "@/app/models/event";
 import { isEventActive } from "@/app/models/event";
 
+type TemplateInput = {
+  coatNumber: string;
+  fullName: string;
+  phone?: string;
+  email?: string;
+  staff?: string;
+  notes?: string;
+  createdAt?: number;
+};
+
+function buildDeclarationRO(t: TemplateInput) {
+  const descriere = t.notes?.trim()
+    ? t.notes.trim()
+    : "[Marca, modelul, seria, culoarea, starea etc.]";
+  const staffText = (t.staff && t.staff.trim()) || "(staff member)";
+  const lines = [
+    "Declarație pe propria răspundere",
+    `Subsemnatul(a) ${t.fullName}, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. ${t.coatNumber} cu următoarele caracteristici: ${descriere}, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.`,
+    "Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.",
+    "Predarea se face strict pe răspunderea mea și în baza declarațiilor mele.",
+    `Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului ${staffText}, reprezentant al Zebra Music Production s.r.l..`,
+    `Data: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
+  ];
+  return lines.join("\n\n");
+}
+
+function buildDeclarationEN(t: TemplateInput) {
+  const descriere = t.notes?.trim()
+    ? t.notes.trim()
+    : "[Brand, model, serial, color, condition, etc.]";
+  const staffText = (t.staff && t.staff.trim()) || "(staff member)";
+  const lines = [
+    "Self-Declaration",
+    `I, ${t.fullName}, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. ${t.coatNumber}, with the following characteristics: ${descriere}, without presenting the ticket received at deposit, as I declare I have lost it.`,
+    "I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.",
+    "The handover is made strictly under my responsibility and based on my statements.",
+    `This is the statement that I make, sign, and uphold in the presence of Mr. ${staffText}, representative of Zebra Music Production S.R.L.`,
+    `Date: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
+  ];
+  return lines.join("\n\n");
+}
+
 export default function HandoverClient() {
   const { push } = useToast();
   const [coatNumber, setCoatNumber] = useState("");
@@ -17,13 +59,9 @@ export default function HandoverClient() {
   const [staff, setStaff] = useState("");
   const [notes, setNotes] = useState("");
   const [language, setLanguage] = useState<"ro" | "en">("ro");
-  // Events state
   const [events, setEvents] = useState<Event[]>([]);
   const [activeEvents, setActiveEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  // Removed unused search/list state to satisfy production lint; restore if list UI returns
-  // const [q, setQ] = useState("");
-  // const [items, setItems] = useState<HandoverReport[]>([]);
   const coatRef = useRef<HTMLInputElement>(null);
   const [me, setMe] = useState<{ fullName: string; type?: string } | null>(
     null
@@ -39,8 +77,6 @@ export default function HandoverClient() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(
     undefined
   );
-  // Expected first four photos order guidance
-  // expectedPhotoLabels not directly used (labels derive from expectedPhotoDetails)
   const expectedPhotoDetails: { label: string; tips: string[] }[] = [
     {
       label: "Client ID document",
@@ -77,16 +113,15 @@ export default function HandoverClient() {
   ];
   const [activePhotoSlot, setActivePhotoSlot] = useState<number | null>(null);
 
-  // Reset manual verification if phone number is altered after verification
+  // Phone verification reset when number changes
   useEffect(() => {
-    // If user edits the phone after verifying, force re-verify
     setPhoneVerified(false);
     setPhoneVerifiedAt(null);
     setCallPhase("idle");
     setCallStartedAt(null);
   }, [phone]);
 
-  // Phone call verification state
+  // Call verification state machine
   const [callPhase, setCallPhase] = useState<
     "idle" | "dialing" | "ready-confirm"
   >("idle");
@@ -96,8 +131,6 @@ export default function HandoverClient() {
   }, [callPhase]);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const wasHiddenDuringDial = useRef(false);
-
-  // Listen for page visibility changes to infer user returning after attempting a call
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === "hidden") {
@@ -123,7 +156,6 @@ export default function HandoverClient() {
     setStream(null);
     setCameraOpen(false);
   }
-
   async function refreshDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
@@ -140,50 +172,6 @@ export default function HandoverClient() {
       console.error(e);
     }
   }
-
-  type TemplateInput = {
-    coatNumber: string;
-    fullName: string;
-    phone?: string;
-    email?: string;
-    staff?: string;
-    notes?: string; // used as description
-    createdAt?: number;
-  };
-
-  function buildDeclarationRO(t: TemplateInput) {
-    const descriere = t.notes?.trim()
-      ? t.notes.trim()
-      : "[Marca, modelul, seria, culoarea, starea etc.]";
-    const staffText = (t.staff && t.staff.trim()) || "(staff member)";
-    const lines = [
-      "Declarație pe propria răspundere",
-      `Subsemnatul(a) ${t.fullName}, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. ${t.coatNumber} cu următoarele caracteristici: ${descriere}, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.`,
-      "Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.",
-      "Predarea se face strict pe răspunderea mea și în baza declarațiilor mele.",
-      `Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului ${staffText}, reprezentant al Zebra Music Production s.r.l..`,
-      `Data: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
-    ];
-    return lines.join("\n\n");
-  }
-
-  function buildDeclarationEN(t: TemplateInput) {
-    const descriere = t.notes?.trim()
-      ? t.notes.trim()
-      : "[Brand, model, serial, color, condition, etc.]";
-    const staffText = (t.staff && t.staff.trim()) || "(staff member)";
-    const lines = [
-      "Self-Declaration",
-      `I, ${t.fullName}, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. ${t.coatNumber}, with the following characteristics: ${descriere}, without presenting the ticket received at deposit, as I declare I have lost it.`,
-      "I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.",
-      "The handover is made strictly under my responsibility and based on my statements.",
-      `This is the statement that I make, sign, and uphold in the presence of Mr. ${staffText}, representative of Zebra Music Production S.R.L.`,
-      `Date: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
-    ];
-    return lines.join("\n\n");
-  }
-
-  // Camera start function (re-added after refactor)
   async function startCamera() {
     setCameraError(null);
     try {
@@ -204,7 +192,7 @@ export default function HandoverClient() {
           if ("srcObject" in el) {
             el.srcObject = s;
           } else {
-            // @ts-expect-error legacy fallback for very old browsers without srcObject
+            // @ts-expect-error legacy fallback
             el.src = URL.createObjectURL(s);
           }
           await el.play();
@@ -230,11 +218,10 @@ export default function HandoverClient() {
     }
   }
 
-  // Initial focus and device enumeration (list fetching removed for now)
+  // Initial load
   useEffect(() => {
     coatRef.current?.focus();
     void refreshDevices();
-    // fetch current staff user
     void fetch("/api/auth/me", { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
@@ -244,7 +231,6 @@ export default function HandoverClient() {
       .catch(() => {});
     const handler = () => void refreshDevices();
     navigator.mediaDevices?.addEventListener?.("devicechange", handler);
-    // Auto-start camera after initial device enumeration (delay for permission prompt order)
     const autoTimer = setTimeout(() => {
       if (!cameraOpen) void startCamera();
     }, 250);
@@ -254,7 +240,7 @@ export default function HandoverClient() {
     };
   }, []);
 
-  // Fetch events & determine active ones
+  // Events polling
   useEffect(() => {
     let cancelled = false;
     async function loadEvents() {
@@ -263,17 +249,14 @@ export default function HandoverClient() {
         const json = (await res.json()) as { items?: Event[] };
         if (!cancelled && Array.isArray(json.items)) {
           const all = json.items;
-          // sort by startsAt ascending for deterministic ordering
           all.sort((a, b) => a.startsAt - b.startsAt);
           setEvents(all);
           const now = Date.now();
           const actives = all.filter((e) => isEventActive(e, now));
           setActiveEvents(actives);
-          // Auto-select logic: if only one active event, select it
           if (actives.length === 1) {
             setSelectedEventId(actives[0].id);
           } else if (actives.length > 1) {
-            // keep previous selection if still active; otherwise unset
             setSelectedEventId((prev) =>
               prev && actives.some((e) => e.id === prev) ? prev : null
             );
@@ -286,20 +269,18 @@ export default function HandoverClient() {
       }
     }
     void loadEvents();
-    const interval = setInterval(loadEvents, 60_000); // refresh every minute in case of schedule changes
+    const interval = setInterval(loadEvents, 60000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
   }, []);
 
+  // Re-start camera when device changes
   useEffect(() => {
     if (cameraOpen) void startCamera();
-    // Intentionally excluding startCamera from deps to avoid recreation loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDeviceId, cameraOpen]);
-
-  // fetchList removed (no list UI active). Reintroduce if browsing past handovers client-side.
 
   async function submit() {
     if (!coatNumber.trim() || !fullName.trim()) return;
@@ -343,8 +324,6 @@ export default function HandoverClient() {
       setStaff("");
       setNotes("");
       setPhotos([]);
-      // keep selected event (do not reset) so multiple handovers during same event are tagged
-      // Listing refresh skipped (list UI not present)
       try {
         sessionStorage.setItem(`handover:${id}`, JSON.stringify(payload));
       } catch {}
@@ -358,22 +337,20 @@ export default function HandoverClient() {
     }
   }
 
-  // Unused helper functions (print/delete/update) removed to satisfy lint; restore if UI adds management actions.
-
-  // Removed unused fileToJpegDataUrl helper (no signed doc upload UI).
-
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
-      <h1 className="text-3xl font-bold text-foreground">
-        Handover/Reception report
-      </h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Create a report for clients who lost their ticket, using the coat
-        number.
-      </p>
+      <div className="lg:max-w-3xl mx-auto">
+        <h1 className="text-3xl font-bold text-foreground lg:text-center">
+          Handover/Reception report
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground lg:text-center">
+          Create a report for clients who lost their ticket, using the coat
+          number.
+        </p>
+      </div>
 
-      <div className="mt-6 grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-4">
+      <div className="mt-6 flex justify-center">
+        <div className="w-full max-w-3xl rounded-2xl border border-border bg-card p-4">
           {/* Event selection / status */}
           <div className="mb-4 flex flex-col gap-1">
             <div className="flex items-center gap-3 flex-wrap">
@@ -631,351 +608,392 @@ export default function HandoverClient() {
               Evidence Photos
             </h2>
           </div>
-          {/* Photos capture/upload (require ordered 4) */}
-          <div className="mt-6">
-            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold text-foreground">
-                  Photos (required 4)
-                </h3>
-                <div className="mt-1 space-y-2 text-[11px] leading-tight text-muted-foreground max-w-lg">
+          <div className="mt-6" aria-labelledby="evidence-photos-heading">
+            <h3 id="evidence-photos-heading" className="sr-only">
+              Evidence photos capture
+            </h3>
+            <div className="grid gap-6 lg:grid-cols-12">
+              <div className="lg:col-span-6 xl:col-span-7">
+                <div className="flex items-center justify-between">
+                  <p className="text-base font-semibold text-foreground">
+                    Photos (required 4)
+                  </p>
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    {Math.min(photos.length, 4)}/4 required captured
+                  </span>
+                </div>
+                <ol className="mt-2 space-y-2 text-[11px] leading-tight text-muted-foreground">
                   {expectedPhotoDetails.map((slot, i) => {
-                    const done = photos[i];
+                    const done = !!photos[i];
                     const next = photos.length === i;
+                    // On small & extra-small screens show ONLY the current (next) step until all 4 are captured.
+                    const showAll = photos.length >= 4; // after completion show every step again
+                    const hideOnMobile = !showAll && !next && !done; // hide future non-current steps
+                    const hideCompletedOnMobile = !showAll && done; // hide completed steps too until finished
                     return (
-                      <div
+                      <li
                         key={slot.label}
-                        className={`rounded-md border px-2 py-1.5 ${
+                        className={`rounded-md border px-2 py-2 transition-colors ${
+                          hideOnMobile || hideCompletedOnMobile
+                            ? "hidden md:block"
+                            : ""
+                        } ${
                           done
                             ? "border-green-600/40 bg-green-600/5"
                             : next
-                            ? "border-accent/50 bg-accent/5"
+                            ? "border-accent/60 bg-accent/5 animate-pulse"
                             : photos.length > i
                             ? "border-green-600/40 bg-green-600/5"
-                            : "border-border bg-muted/30"
+                            : "border-border bg-muted/20"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-2">
                           <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
+                            className={`mt-0.5 inline-flex h-5 w-5 flex-none items-center justify-center rounded-full text-[10px] font-semibold ring-1 ring-inset ${
                               done
-                                ? "bg-green-600 text-white"
+                                ? "bg-green-600 text-white ring-green-600/60"
                                 : next
-                                ? "bg-accent text-accent-foreground"
-                                : "bg-muted text-foreground"
+                                ? "bg-accent text-accent-foreground ring-accent/70"
+                                : "bg-muted text-foreground ring-border"
                             }`}
                           >
                             {i + 1}
                           </span>
-                          <span className="font-medium">
-                            {slot.label}
-                            {done
-                              ? " – captured"
-                              : next
-                              ? " – capture now"
-                              : ""}
-                          </span>
-                          {done && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActivePhotoSlot(i);
-                                if (!cameraOpen) void startCamera();
-                                push({
-                                  message: `Retake slot ${i + 1} (${
-                                    slot.label
-                                  })`,
-                                  variant: "info",
-                                });
-                              }}
-                              className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 hover:bg-muted"
-                            >
-                              Retake
-                            </button>
-                          )}
-                          {!done && next && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActivePhotoSlot(i);
-                                if (!cameraOpen) void startCamera();
-                              }}
-                              className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 hover:bg-muted"
-                            >
-                              Select camera
-                            </button>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">
+                                {slot.label}
+                                {done
+                                  ? " – captured"
+                                  : next
+                                  ? " – capture now"
+                                  : ""}
+                              </span>
+                              {done && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActivePhotoSlot(i);
+                                    if (!cameraOpen) void startCamera();
+                                    push({
+                                      message: `Retake slot ${i + 1} (${
+                                        slot.label
+                                      })`,
+                                      variant: "info",
+                                    });
+                                  }}
+                                  className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                                >
+                                  Retake
+                                </button>
+                              )}
+                              {!done && next && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActivePhotoSlot(i);
+                                    if (!cameraOpen) void startCamera();
+                                  }}
+                                  className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                                >
+                                  Select camera
+                                </button>
+                              )}
+                            </div>
+                            <ul className="mt-1 ml-1 pl-5 list-disc space-y-0.5">
+                              {slot.tips.map((t) => (
+                                <li key={t}>{t}</li>
+                              ))}
+                            </ul>
+                          </div>
                         </div>
-                        <ul className="mt-1 ml-7 list-disc space-y-0.5">
-                          {slot.tips.map((t) => (
-                            <li key={t}>{t}</li>
-                          ))}
-                        </ul>
-                      </div>
+                      </li>
                     );
                   })}
-                  {photos.length >= 4 && (
-                    <div className="text-[10px] pt-1 text-muted-foreground">
-                      Additional (optional) evidence photos may be added after
-                      the 4 required slots.
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-start gap-2 w-full sm:w-auto sm:self-start">
-                {!cameraOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => void startCamera()}
-                    className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
-                  >
-                    Camera
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
-                  >
-                    Close
-                  </button>
-                )}
-                {/* Camera device selector */}
-                <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-                  <select
-                    value={selectedDeviceId || ""}
-                    onChange={(e) =>
-                      setSelectedDeviceId(e.target.value || undefined)
-                    }
-                    className="rounded-full border border-border bg-background px-3 py-1 text-sm w-full sm:min-w-40 flex-1 max-w-full"
-                    aria-label="Camera device"
-                  >
-                    {videoDevices.length === 0 ? (
-                      <option value="">No cameras</option>
-                    ) : (
-                      videoDevices.map((d, i) => (
-                        <option key={d.deviceId || i} value={d.deviceId}>
-                          {d.label || `Camera ${i + 1}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => void refreshDevices()}
-                    className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
-                  >
-                    Refresh
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void startCamera()}
-                    className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
-                    title="Use selected camera"
-                  >
-                    Use
-                  </button>
-                </div>
-                <label className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed w-full sm:w-auto">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        if (typeof reader.result === "string") {
-                          setPhotos((arr) => {
-                            // If still filling required slots, append only if it is the next slot
-                            if (arr.length < 4) {
-                              if (
-                                arr.length === 0 ||
-                                arr.length === arr.filter(Boolean).length
-                              ) {
-                                return [...arr, reader.result as string];
-                              }
-                              return arr; // out of order ignore
-                            }
-                            return [...arr, reader.result as string];
-                          });
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                  Add photo
-                </label>
-              </div>
-            </div>
-            {cameraOpen ? (
-              <div className="mt-3">
-                <video
-                  ref={videoRef}
-                  className="w-full rounded-lg border border-border bg-black aspect-video"
-                  muted
-                  playsInline
-                  autoPlay
-                />
-                {cameraError ? (
-                  <p className="mt-2 text-sm text-red-600" aria-live="polite">
-                    {cameraError}
+                </ol>
+                {photos.length >= 4 && (
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    You can continue adding optional evidence photos after the
+                    first four.
                   </p>
-                ) : null}
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!videoRef.current || !canvasRef.current) return;
-                      const v = videoRef.current;
-                      const rawW = v.videoWidth || 1280;
-                      const rawH = v.videoHeight || 720;
-                      const landscape = rawW >= rawH;
-                      const c = canvasRef.current;
-                      const ctx = c.getContext("2d");
-                      if (!ctx) return;
-                      if (landscape) {
-                        c.width = rawW;
-                        c.height = rawH;
-                        ctx.drawImage(v, 0, 0, rawW, rawH);
-                      } else {
-                        c.width = rawH;
-                        c.height = rawW;
-                        ctx.save();
-                        ctx.translate(c.width / 2, c.height / 2);
-                        ctx.rotate((90 * Math.PI) / 180);
-                        ctx.drawImage(v, -rawW / 2, -rawH / 2, rawW, rawH);
-                        ctx.restore();
-                      }
-                      const dataUrl = c.toDataURL("image/jpeg", 0.9);
-                      setPhotos((arr) => {
-                        if (activePhotoSlot != null) {
-                          const copy = [...arr];
-                          copy[activePhotoSlot] = dataUrl;
-                          // If capturing a slot beyond current length (should not happen), fill intervening with placeholders? We'll ignore.
-                          return copy;
-                        }
-                        // Normal flow: fill next slot or append additional
-                        if (arr.length < 4) return [...arr, dataUrl];
-                        return [...arr, dataUrl];
-                      });
-                      setActivePhotoSlot(null);
-                    }}
-                    className="inline-flex items-center rounded-full bg-accent text-accent-foreground px-4 py-2 text-sm font-medium shadow hover:opacity-95"
-                  >
-                    {activePhotoSlot != null && activePhotoSlot < 4
-                      ? `Capture slot ${activePhotoSlot + 1}`
-                      : photos.length < 4
-                      ? `Capture slot ${photos.length + 1}`
-                      : "Capture extra"}
-                  </button>
-                </div>
-                <canvas ref={canvasRef} className="hidden" />
+                )}
+                {photos.length < 4 && (
+                  <p className="mt-3 text-xs text-red-600">
+                    Please add all 4 required photos before saving.
+                  </p>
+                )}
               </div>
-            ) : null}
-
-            {photos.length > 0 ? (
-              <div className="mt-4 space-y-4">
-                {/* Required slots gallery */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {Array.from({ length: 4 }).map((_, i) => {
-                    const src = photos[i];
-                    const meta = expectedPhotoDetails[i];
-                    return (
-                      <div
-                        key={i}
-                        className={`relative rounded-lg border h-32 overflow-hidden flex items-center justify-center text-center text-[11px] p-2 ${
-                          src
-                            ? "border-green-600/50"
-                            : photos.length === i
-                            ? "border-accent"
-                            : "border-border bg-muted/30"
-                        }`}
+              <div className="lg:col-span-6 xl:col-span-5 space-y-4">
+                <div className="rounded-lg border border-border p-3 bg-muted/10">
+                  <div className="flex flex-wrap gap-2">
+                    {!cameraOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => void startCamera()}
+                        className="flex-1 sm:flex-none text-sm rounded-full border border-border px-4 py-1.5 hover:bg-muted"
                       >
-                        {src ? (
-                          <>
-                            <Image
-                              src={src}
-                              alt={`slot-${i + 1}`}
-                              fill
-                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                              className="object-cover"
-                            />
-                            <div className="absolute top-0 left-0 bg-black/60 text-[10px] px-1.5 py-0.5 rounded-br text-white flex items-center gap-1">
-                              <span className="font-semibold">{i + 1}</span>
-                              <span>{meta.label}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActivePhotoSlot(i);
-                                if (!cameraOpen) void startCamera();
-                              }}
-                              className="absolute bottom-1 right-1 text-[10px] rounded-full bg-black/60 text-white px-2 py-0.5 hover:bg-black/80"
-                            >
-                              Replace
-                            </button>
-                          </>
-                        ) : (
+                        Open camera
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="flex-1 sm:flex-none text-sm rounded-full border border-border px-4 py-1.5 hover:bg-muted"
+                      >
+                        Close camera
+                      </button>
+                    )}
+                    <label className="flex-1 sm:flex-none text-center text-sm rounded-full border border-border px-4 py-1.5 hover:bg-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === "string") {
+                              setPhotos((arr) => {
+                                if (arr.length < 4) {
+                                  if (
+                                    arr.length === arr.filter(Boolean).length
+                                  ) {
+                                    return [...arr, reader.result as string];
+                                  }
+                                  return arr; // out of order ignore
+                                }
+                                return [...arr, reader.result as string];
+                              });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      Upload photo
+                    </label>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <select
+                      value={selectedDeviceId || ""}
+                      onChange={(e) =>
+                        setSelectedDeviceId(e.target.value || undefined)
+                      }
+                      className="w-full sm:flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+                      aria-label="Camera device"
+                    >
+                      {videoDevices.length === 0 ? (
+                        <option value="">No cameras</option>
+                      ) : (
+                        videoDevices.map((d, i) => (
+                          <option key={d.deviceId || i} value={d.deviceId}>
+                            {d.label || `Camera ${i + 1}`}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => void refreshDevices()}
+                        className="flex-1 sm:flex-none text-sm rounded-full border border-border px-3 py-1.5 hover:bg-muted"
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void startCamera()}
+                        className="flex-1 sm:flex-none text-sm rounded-full border border-border px-3 py-1.5 hover:bg-muted"
+                        title="Use selected camera"
+                      >
+                        Use
+                      </button>
+                    </div>
+                  </div>
+                  {cameraOpen && (
+                    <div className="mt-4">
+                      <div className="relative group">
+                        <video
+                          ref={videoRef}
+                          className="w-full rounded-lg border border-border bg-black aspect-video"
+                          muted
+                          playsInline
+                          autoPlay
+                        />
+                        <div className="pointer-events-none absolute inset-0 rounded-lg ring-1 ring-inset ring-white/5 group-hover:ring-accent/60 transition" />
+                      </div>
+                      {cameraError ? (
+                        <p
+                          className="mt-2 text-xs text-red-600"
+                          aria-live="polite"
+                        >
+                          {cameraError}
+                        </p>
+                      ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!videoRef.current || !canvasRef.current) return;
+                            const v = videoRef.current;
+                            const rawW = v.videoWidth || 1280;
+                            const rawH = v.videoHeight || 720;
+                            const landscape = rawW >= rawH;
+                            const c = canvasRef.current;
+                            const ctx = c.getContext("2d");
+                            if (!ctx) return;
+                            if (landscape) {
+                              c.width = rawW;
+                              c.height = rawH;
+                              ctx.drawImage(v, 0, 0, rawW, rawH);
+                            } else {
+                              c.width = rawH;
+                              c.height = rawW;
+                              ctx.save();
+                              ctx.translate(c.width / 2, c.height / 2);
+                              ctx.rotate((90 * Math.PI) / 180);
+                              ctx.drawImage(
+                                v,
+                                -rawW / 2,
+                                -rawH / 2,
+                                rawW,
+                                rawH
+                              );
+                              ctx.restore();
+                            }
+                            const dataUrl = c.toDataURL("image/jpeg", 0.9);
+                            setPhotos((arr) => {
+                              if (activePhotoSlot != null) {
+                                const copy = [...arr];
+                                copy[activePhotoSlot] = dataUrl;
+                                return copy;
+                              }
+                              if (arr.length < 4) return [...arr, dataUrl];
+                              return [...arr, dataUrl];
+                            });
+                            setActivePhotoSlot(null);
+                          }}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-full bg-accent text-accent-foreground px-4 py-2 text-sm font-medium shadow hover:opacity-95"
+                        >
+                          {activePhotoSlot != null && activePhotoSlot < 4
+                            ? `Capture slot ${activePhotoSlot + 1}`
+                            : photos.length < 4
+                            ? `Capture slot ${photos.length + 1}`
+                            : "Capture extra"}
+                        </button>
+                        {activePhotoSlot != null && (
                           <button
                             type="button"
-                            onClick={() => {
-                              if (photos.length !== i) return; // enforce order
-                              setActivePhotoSlot(i);
-                              if (!cameraOpen) void startCamera();
-                            }}
-                            className="flex flex-col items-center gap-1 text-foreground/70 hover:text-foreground"
+                            onClick={() => setActivePhotoSlot(null)}
+                            className="sm:flex-none text-sm rounded-full border border-border px-4 py-2 hover:bg-muted"
                           >
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-medium">
-                              {i + 1}
-                            </span>
-                            <span className="font-medium leading-tight">
-                              {meta.label}
-                            </span>
-                            <span className="text-[9px] leading-tight opacity-70">
-                              {meta.tips[0]}
-                            </span>
+                            Cancel slot
                           </button>
                         )}
                       </div>
-                    );
-                  })}
+                      <canvas ref={canvasRef} className="hidden" />
+                    </div>
+                  )}
                 </div>
-                {photos.length > 4 && (
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
-                      Additional evidence
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                      {photos.slice(4).map((src, i) => (
-                        <div
-                          key={i}
-                          className="relative rounded-lg overflow-hidden border border-border h-28"
-                        >
-                          <Image
-                            src={src}
-                            alt={`extra-${i}`}
-                            fill
-                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                            className="object-cover"
-                          />
-                          <div className="absolute top-0 left-0 bg-black/50 text-[10px] px-1.5 py-0.5 rounded-br text-white">
-                            +{i + 1}
+                {photos.length > 0 && (
+                  <div className="rounded-lg border border-border p-3 bg-muted/10">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {Array.from({ length: 4 }).map((_, i) => {
+                        const src = photos[i];
+                        const meta = expectedPhotoDetails[i];
+                        return (
+                          <div
+                            key={i}
+                            className={`relative rounded-md border h-32 overflow-hidden flex items-center justify-center text-center text-[11px] p-2 transition ${
+                              src
+                                ? "border-green-600/50"
+                                : photos.length === i
+                                ? "border-accent"
+                                : "border-border bg-muted/30"
+                            }`}
+                          >
+                            {src ? (
+                              <>
+                                <Image
+                                  src={src}
+                                  alt={`slot-${i + 1}`}
+                                  fill
+                                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                  className="object-cover"
+                                />
+                                <div className="absolute top-0 left-0 bg-black/60 text-[10px] px-1.5 py-0.5 rounded-br text-white flex items-center gap-1">
+                                  <span className="font-semibold">{i + 1}</span>
+                                  <span className="hidden md:inline">
+                                    {meta.label}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActivePhotoSlot(i);
+                                    if (!cameraOpen) void startCamera();
+                                  }}
+                                  className="absolute bottom-1 right-1 text-[10px] rounded-full bg-black/60 text-white px-2 py-0.5 hover:bg-black/80"
+                                >
+                                  Replace
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (photos.length !== i) return;
+                                  setActivePhotoSlot(i);
+                                  if (!cameraOpen) void startCamera();
+                                }}
+                                className="flex flex-col items-center gap-1 text-foreground/70 hover:text-foreground"
+                              >
+                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-medium">
+                                  {i + 1}
+                                </span>
+                                <span className="font-medium leading-tight line-clamp-2">
+                                  {meta.label}
+                                </span>
+                                <span className="text-[9px] leading-tight opacity-70">
+                                  {meta.tips[0]}
+                                </span>
+                              </button>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
+                    {photos.length > 4 && (
+                      <div className="mt-4">
+                        <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
+                          Additional evidence
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {photos.slice(4).map((src, i) => (
+                            <div
+                              key={i}
+                              className="relative rounded-md overflow-hidden border border-border h-28"
+                            >
+                              <Image
+                                src={src}
+                                alt={`extra-${i}`}
+                                fill
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                className="object-cover"
+                              />
+                              <div className="absolute top-0 left-0 bg-black/50 text-[10px] px-1.5 py-0.5 rounded-br text-white">
+                                +{i + 1}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            ) : null}
-            {photos.length < 4 ? (
-              <p className="mt-2 text-xs text-red-600">
-                Please add all 4 required photos before saving.
-              </p>
-            ) : null}
+            </div>
           </div>
           {/* Section 5: Declarations Preview */}
           <div className="flex items-center gap-2 mb-2 mt-10">
