@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useToast } from "@/app/private/toast/ToastContext";
 import Image from "next/image";
 import type { HandoverReport } from "@/app/models/handover";
@@ -79,6 +79,10 @@ export default function HandoverClient() {
   );
   // Guard against overlapping camera start attempts (prevents AbortError on play)
   const startingCameraRef = useRef(false);
+  // Track the device id currently providing the active stream to avoid redundant restarts
+  const activeDeviceIdRef = useRef<string | null>(null);
+  // Mirror stream in a ref for stable access inside useCallback without triggering deps
+  const streamRef = useRef<MediaStream | null>(null);
   const expectedPhotoDetails: { label: string; tips: string[] }[] = [
     {
       label: "Client ID document",
@@ -154,9 +158,11 @@ export default function HandoverClient() {
 
   function stopCamera() {
     videoRef.current?.pause();
-    stream?.getTracks().forEach((tr) => tr.stop());
+    (streamRef.current || stream)?.getTracks().forEach((tr) => tr.stop());
+    streamRef.current = null;
     setStream(null);
     setCameraOpen(false);
+    activeDeviceIdRef.current = null;
   }
   async function refreshDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -174,7 +180,16 @@ export default function HandoverClient() {
       console.error(e);
     }
   }
-  async function startCamera() {
+  const startCamera = useCallback(async () => {
+    // If the camera is already open with the same device, skip restart to reduce flicker
+    if (
+      cameraOpen &&
+      activeDeviceIdRef.current &&
+      activeDeviceIdRef.current === (selectedDeviceId || activeDeviceIdRef.current) &&
+      streamRef.current
+    ) {
+      return;
+    }
     if (startingCameraRef.current) return;
     startingCameraRef.current = true;
     setCameraError(null);
@@ -187,16 +202,14 @@ export default function HandoverClient() {
       };
       const s = await navigator.mediaDevices.getUserMedia(constraints);
       // Stop prior stream tracks before replacing
-      stream?.getTracks().forEach((tr) => tr.stop());
+      (streamRef.current || stream)?.getTracks().forEach((tr) => tr.stop());
+      streamRef.current = s;
       setStream(s);
       if (videoRef.current) {
-        const el = videoRef.current as HTMLVideoElement & {
-          srcObject?: MediaStream;
-        };
+        const el = videoRef.current as HTMLVideoElement & { srcObject?: MediaStream };
         try {
           if ("srcObject" in el) {
-            // Clear first to reduce play() AbortError risk
-            el.srcObject = null as unknown as MediaStream;
+            el.srcObject = null as unknown as MediaStream; // clear first
             el.srcObject = s;
           } else {
             // @ts-expect-error legacy fallback
@@ -222,6 +235,10 @@ export default function HandoverClient() {
           );
         }
       }
+      // Capture the actual device id from track settings (may differ when using facingMode)
+      const actualDeviceId =
+        s.getVideoTracks()[0]?.getSettings().deviceId || selectedDeviceId || null;
+      activeDeviceIdRef.current = actualDeviceId;
       setCameraOpen(true);
       await refreshDevices();
     } catch (e) {
@@ -237,7 +254,7 @@ export default function HandoverClient() {
     } finally {
       startingCameraRef.current = false;
     }
-  }
+  }, [selectedDeviceId, cameraOpen]);
 
   // Initial load
   useEffect(() => {
@@ -299,7 +316,15 @@ export default function HandoverClient() {
 
   // Re-start camera when device changes
   useEffect(() => {
-    if (cameraOpen) void startCamera();
+    if (!cameraOpen) return;
+    if (
+      activeDeviceIdRef.current &&
+      activeDeviceIdRef.current === (selectedDeviceId || activeDeviceIdRef.current) &&
+      streamRef.current
+    ) {
+      return; // already running desired device
+    }
+    void startCamera();
   }, [selectedDeviceId, cameraOpen, startCamera]);
 
   async function submit() {
