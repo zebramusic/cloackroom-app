@@ -83,6 +83,8 @@ export default function HandoverClient() {
   const activeDeviceIdRef = useRef<string | null>(null);
   // Mirror stream in a ref for stable access inside useCallback without triggering deps
   const streamRef = useRef<MediaStream | null>(null);
+  // Cooldown to prevent rapid restart loops that cause visible flicker
+  const lastCameraStartAtRef = useRef<number>(0);
   const expectedPhotoDetails: { label: string; tips: string[] }[] = [
     {
       label: "Client ID document",
@@ -190,6 +192,15 @@ export default function HandoverClient() {
     ) {
       return;
     }
+    const now = Date.now();
+    if (
+      now - lastCameraStartAtRef.current < 1500 &&
+      activeDeviceIdRef.current &&
+      activeDeviceIdRef.current === (selectedDeviceId || activeDeviceIdRef.current)
+    ) {
+      // Throttle restarts for same device within 1.5s window
+      return;
+    }
     if (startingCameraRef.current) return;
     startingCameraRef.current = true;
     setCameraError(null);
@@ -209,8 +220,8 @@ export default function HandoverClient() {
         const el = videoRef.current as HTMLVideoElement & { srcObject?: MediaStream };
         try {
           if ("srcObject" in el) {
-            el.srcObject = null as unknown as MediaStream; // clear first
-            el.srcObject = s;
+            // Only assign if different to avoid visible blanking
+            if (el.srcObject !== s) el.srcObject = s;
           } else {
             // @ts-expect-error legacy fallback
             el.src = "";
@@ -240,7 +251,7 @@ export default function HandoverClient() {
         s.getVideoTracks()[0]?.getSettings().deviceId || selectedDeviceId || null;
       activeDeviceIdRef.current = actualDeviceId;
       setCameraOpen(true);
-      await refreshDevices();
+      lastCameraStartAtRef.current = Date.now();
     } catch (e) {
       console.error(e);
       const err = e as { name?: string } | null;
