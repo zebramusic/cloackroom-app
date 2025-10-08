@@ -187,7 +187,8 @@ export default function HandoverClient() {
     if (
       cameraOpen &&
       activeDeviceIdRef.current &&
-      activeDeviceIdRef.current === (selectedDeviceId || activeDeviceIdRef.current) &&
+      activeDeviceIdRef.current ===
+        (selectedDeviceId || activeDeviceIdRef.current) &&
       streamRef.current
     ) {
       return;
@@ -196,7 +197,8 @@ export default function HandoverClient() {
     if (
       now - lastCameraStartAtRef.current < 1500 &&
       activeDeviceIdRef.current &&
-      activeDeviceIdRef.current === (selectedDeviceId || activeDeviceIdRef.current)
+      activeDeviceIdRef.current ===
+        (selectedDeviceId || activeDeviceIdRef.current)
     ) {
       // Throttle restarts for same device within 1.5s window
       return;
@@ -217,7 +219,9 @@ export default function HandoverClient() {
       streamRef.current = s;
       setStream(s);
       if (videoRef.current) {
-        const el = videoRef.current as HTMLVideoElement & { srcObject?: MediaStream };
+        const el = videoRef.current as HTMLVideoElement & {
+          srcObject?: MediaStream;
+        };
         try {
           if ("srcObject" in el) {
             // Only assign if different to avoid visible blanking
@@ -248,7 +252,9 @@ export default function HandoverClient() {
       }
       // Capture the actual device id from track settings (may differ when using facingMode)
       const actualDeviceId =
-        s.getVideoTracks()[0]?.getSettings().deviceId || selectedDeviceId || null;
+        s.getVideoTracks()[0]?.getSettings().deviceId ||
+        selectedDeviceId ||
+        null;
       activeDeviceIdRef.current = actualDeviceId;
       setCameraOpen(true);
       lastCameraStartAtRef.current = Date.now();
@@ -330,7 +336,8 @@ export default function HandoverClient() {
     if (!cameraOpen) return;
     if (
       activeDeviceIdRef.current &&
-      activeDeviceIdRef.current === (selectedDeviceId || activeDeviceIdRef.current) &&
+      activeDeviceIdRef.current ===
+        (selectedDeviceId || activeDeviceIdRef.current) &&
       streamRef.current
     ) {
       return; // already running desired device
