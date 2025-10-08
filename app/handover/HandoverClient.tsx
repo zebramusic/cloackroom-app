@@ -77,6 +77,8 @@ export default function HandoverClient() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(
     undefined
   );
+  // Guard against overlapping camera start attempts (prevents AbortError on play)
+  const startingCameraRef = useRef(false);
   const expectedPhotoDetails: { label: string; tips: string[] }[] = [
     {
       label: "Client ID document",
@@ -173,6 +175,8 @@ export default function HandoverClient() {
     }
   }
   async function startCamera() {
+    if (startingCameraRef.current) return;
+    startingCameraRef.current = true;
     setCameraError(null);
     try {
       const constraints: MediaStreamConstraints = {
@@ -182,22 +186,35 @@ export default function HandoverClient() {
         audio: false,
       };
       const s = await navigator.mediaDevices.getUserMedia(constraints);
+      // Stop prior stream tracks before replacing
       stream?.getTracks().forEach((tr) => tr.stop());
       setStream(s);
       if (videoRef.current) {
-        const el = videoRef.current as HTMLVideoElement & {
-          srcObject?: MediaStream;
-        };
+        const el = videoRef.current as HTMLVideoElement & { srcObject?: MediaStream };
         try {
           if ("srcObject" in el) {
+            // Clear first to reduce play() AbortError risk
+            el.srcObject = null as unknown as MediaStream;
             el.srcObject = s;
           } else {
             // @ts-expect-error legacy fallback
+            el.src = "";
+            // @ts-expect-error legacy fallback
             el.src = URL.createObjectURL(s);
           }
-          await el.play();
+          const playResult = el.play();
+          if (playResult instanceof Promise) {
+            await playResult.catch((err) => {
+              if ((err as DOMException)?.name !== "AbortError") {
+                console.error(err);
+                setCameraError(
+                  "Could not start video playback. Tap the video or check browser permissions."
+                );
+              }
+            });
+          }
         } catch (e) {
-          console.error(e);
+          if ((e as DOMException)?.name !== "AbortError") console.error(e);
           setCameraError(
             "Could not start video playback. Tap the video or check browser permissions."
           );
@@ -215,6 +232,8 @@ export default function HandoverClient() {
           ? "No camera found on this device."
           : "Failed to access the camera. Please check permissions and try again.";
       setCameraError(msg);
+    } finally {
+      startingCameraRef.current = false;
     }
   }
 

@@ -36,10 +36,23 @@ export default function SignedDocClient({
         video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
+      // Stop previous tracks if any
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = s;
       if (videoRef.current) {
+        // Reset before assigning to reduce AbortError
+        videoRef.current.srcObject = null;
         videoRef.current.srcObject = s as MediaStream;
-        await videoRef.current.play();
+        try {
+          const pr = videoRef.current.play();
+            if (pr && typeof (pr as Promise<void>).then === "function") {
+              await (pr as Promise<void>).catch((err) => {
+                if ((err as DOMException)?.name !== "AbortError") console.error(err);
+              });
+            }
+        } catch (err) {
+          if ((err as DOMException)?.name !== "AbortError") console.error(err);
+        }
       }
       setCameraOpen(true);
     } catch (e) {
