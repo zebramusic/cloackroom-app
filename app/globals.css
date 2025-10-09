@@ -78,8 +78,8 @@ body {
   min-height: 297mm;
   max-height: 297mm;
   overflow: visible;
-  /* Restrict print PDF to 75% scale */
-  transform: scale(0.75);
+  /* Restrict print PDF to 80% of A4 paper */
+  transform: scale(0.8);
   transform-origin: top left;
   }
   .pdf-mode .text-section,
