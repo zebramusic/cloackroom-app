@@ -1,6 +1,5 @@
 "use client";
 import { useRouter } from "next/navigation";
-export const metadata = { title: "Not allowed" };
 
 export default function NotAllowedPage() {
   const router = useRouter();
