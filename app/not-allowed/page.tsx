@@ -1,5 +1,6 @@
+import { useRouter } from "next/navigation";
 export const metadata = { title: "Not allowed" };
-export default function NotAllowedPage() {
+  // Only one router declaration needed above return
   return (
     <main
       className="min-h-screen flex flex-col justify-center items-center px-4 sm:px-6 text-center"
@@ -13,12 +14,14 @@ export default function NotAllowedPage() {
           an option below.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
-          <a
-            href="/private/handover"
+          <button
+            type="button"
+            onClick={() => router.push("/private/handover")}
             className="rounded-full bg-accent text-accent-foreground px-5 py-2 text-sm font-medium shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            aria-label="Back to Handover"
           >
             Go to Handover
-          </a>
+          </button>
           <a
             href="/private/admin/login"
             className="text-sm rounded-full border border-border px-5 py-2 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
@@ -29,4 +32,5 @@ export default function NotAllowedPage() {
       </div>
     </main>
   );
+  const router = useRouter();
 }

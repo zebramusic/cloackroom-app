@@ -184,10 +184,11 @@ export default function PrintClient({ id }: Props) {
             "\n@media print{ .print\\:hidden{ display:none !important } }",
         }}
       />
-      <div className="flex items-center justify-between gap-4 print:hidden mb-4">
+      <div className="flex items-center justify-between gap-4 print:hidden mb-4 z-10">
         <Link
           href="/private/handover"
-          className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
+          className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          aria-label="Back to Handover"
         >
           ← Back to Handover
         </Link>
@@ -271,7 +272,7 @@ const styles = `
   body, .print-light { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#fff; color:#111; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size:13px; }
   .print-light { line-height:1.45; }
   /* Single-page enforced grid layout */
-  .single-page-grid{ display:grid; grid-template-columns:1fr 210px; gap:12px; align-items:start; }
+  .single-page-grid{ display:grid; grid-template-columns:1fr; gap:12px; align-items:start; }
   .single-page-grid.narrow-cols{ grid-template-columns:1fr 180px; }
   .single-page-grid .text-section{ display:flex; flex-direction:column; min-width:0; }
   .single-page-grid .photos-section{ display:flex; flex-direction:column; gap:6px; }
@@ -549,7 +550,7 @@ function buildHTML(
   const photos = shown.length
     ? `<div class="photos-box box photos-count-${
         shown.length
-      }">\n        <div class="photos-heading">Fotografii / Photos</div>\n        <div class="grid">\n          ${shown
+      }">\n        <div class="photos-heading">Fotografii / Photos</div>\n        <div class="grid !grid-cols-2">\n          ${shown
         .map((p, i) => `<img src="${p}" alt="photo-${i}" />`)
         .join("")}\n        </div>\n        ${
         extraCount

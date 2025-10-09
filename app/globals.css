@@ -53,6 +53,61 @@ body {
   outline-offset: 2px;
 }
 
+/* Fix html2pdf.js overlay blocking clicks when hidden */
+.html2pdf__overlay[style*="opacity: 0"] {
+  pointer-events: none !important;
+}
+
+/* PDF: Prevent page breaks, enforce single-page layout for handover print */
+.pdf-mode .single-page-grid {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 1px;
+  max-height: 100vh;
+  overflow: hidden;
+  /* Scale down if content overflows for print/PDF */
+  position: relative;
+}
+
+@media print {
+  .pdf-mode .single-page-grid {
+    width: 210mm;
+    min-height: 297mm;
+    max-height: 297mm;
+    overflow: visible;
+    /* Dynamically scale to fit A4 page */
+    transform: scale(calc(1 / (max(1, (var(--pdf-content-height, 297) / 297)))));
+    transform-origin: top left;
+  }
+  .pdf-mode .text-section,
+  .pdf-mode .photos-section {
+    overflow: visible;
+    max-height: none;
+  }
+  .pdf-mode img {
+    object-fit: contain;
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    max-height: none;
+  }
+}
+.pdf-mode .text-section,
+.pdf-mode .photos-section {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.pdf-mode img {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 /* Active nav link helper */
 a[aria-current="page"] {
   text-decoration: underline;
