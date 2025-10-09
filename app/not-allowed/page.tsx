@@ -1,6 +1,8 @@
 import { useRouter } from "next/navigation";
 export const metadata = { title: "Not allowed" };
-  // Only one router declaration needed above return
+
+export default function NotAllowedPage() {
+  const router = useRouter();
   return (
     <main
       className="min-h-screen flex flex-col justify-center items-center px-4 sm:px-6 text-center"
@@ -32,5 +34,4 @@ export const metadata = { title: "Not allowed" };
       </div>
     </main>
   );
-  const router = useRouter();
 }
