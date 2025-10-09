@@ -17,4 +17,5 @@ export interface HandoverReport {
   language?: 'ro' | 'en'; // chosen language for print (single-language mode)
   signedDoc?: string; // data URL of the signed paper handover (photo / scan)
   signedAt?: number; // epoch ms when signedDoc stored
+  clothType?: string; // type of cloth (e.g. Jacket, Coat, Scarf)
 }

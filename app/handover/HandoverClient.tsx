@@ -14,6 +14,7 @@ type TemplateInput = {
   staff?: string;
   notes?: string;
   createdAt?: number;
+  clothType?: string;
 };
 
 function buildDeclarationRO(t: TemplateInput) {
@@ -21,15 +22,17 @@ function buildDeclarationRO(t: TemplateInput) {
     ? t.notes.trim()
     : "[Marca, modelul, seria, culoarea, starea etc.]";
   const staffText = (t.staff && t.staff.trim()) || "(staff member)";
+  const clothTypeText = t.clothType ? `Tip articol: ${t.clothType}` : "";
   const lines = [
     "Declarație pe propria răspundere",
+    clothTypeText,
     `Subsemnatul(a) ${t.fullName}, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. ${t.coatNumber} cu următoarele caracteristici: ${descriere}, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.`,
     "Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.",
     "Predarea se face strict pe răspunderea mea și în baza declarațiilor mele.",
     `Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului ${staffText}, reprezentant al Zebra Music Production s.r.l..`,
     `Data: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
   ];
-  return lines.join("\n\n");
+  return lines.filter(Boolean).join("\n\n");
 }
 
 function buildDeclarationEN(t: TemplateInput) {
@@ -37,15 +40,17 @@ function buildDeclarationEN(t: TemplateInput) {
     ? t.notes.trim()
     : "[Brand, model, serial, color, condition, etc.]";
   const staffText = (t.staff && t.staff.trim()) || "(staff member)";
+  const clothTypeText = t.clothType ? `Item type: ${t.clothType}` : "";
   const lines = [
     "Self-Declaration",
+    clothTypeText,
     `I, ${t.fullName}, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. ${t.coatNumber}, with the following characteristics: ${descriere}, without presenting the ticket received at deposit, as I declare I have lost it.`,
     "I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.",
     "The handover is made strictly under my responsibility and based on my statements.",
     `This is the statement that I make, sign, and uphold in the presence of Mr. ${staffText}, representative of Zebra Music Production S.R.L.`,
     `Date: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
   ];
-  return lines.join("\n\n");
+  return lines.filter(Boolean).join("\n\n");
 }
 
 export default function HandoverClient() {
@@ -58,7 +63,9 @@ export default function HandoverClient() {
   const [email, setEmail] = useState("");
   const [staff, setStaff] = useState("");
   const [notes, setNotes] = useState("");
+  const [clothType, setClothType] = useState("");
   const [language, setLanguage] = useState<"ro" | "en">("ro");
+  const [type, setType] = useState<string>("");
   const [events, setEvents] = useState<Event[]>([]);
   const [activeEvents, setActiveEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -369,6 +376,7 @@ export default function HandoverClient() {
         email: email.trim() || undefined,
         staff: staff.trim() || undefined,
         notes: notes.trim() || undefined,
+        clothType: clothType.trim() || undefined,
         photos,
         createdAt: Date.now(),
         language,
@@ -386,6 +394,7 @@ export default function HandoverClient() {
       setEmail("");
       setStaff("");
       setNotes("");
+      setClothType("");
       setPhotos([]);
       try {
         sessionStorage.setItem(`handover:${id}`, JSON.stringify(payload));
@@ -448,6 +457,17 @@ export default function HandoverClient() {
             )}
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground">
+                Type of cloth
+              </label>
+              <input
+                value={clothType}
+                onChange={(e) => setClothType(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
+                placeholder="e.g. Jacket, Coat, Scarf"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-foreground">
                 Coat number
@@ -649,7 +669,7 @@ export default function HandoverClient() {
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground">
-              Notes (Descriere)
+              Notes (Marca, modelul, seria, culoarea, starea etc.)
             </label>
             <textarea
               value={notes}
@@ -1084,6 +1104,7 @@ export default function HandoverClient() {
                     staff: staff || undefined,
                     notes: notes || undefined,
                     createdAt: Date.now(),
+                    clothType: clothType || undefined,
                   });
                   void navigator.clipboard.writeText(txt);
                 }}
@@ -1102,6 +1123,7 @@ export default function HandoverClient() {
                 staff: staff || undefined,
                 notes: notes || undefined,
                 createdAt: Date.now(),
+                clothType: clothType || undefined,
               })}
               rows={8}
               className="mt-1 w-full rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm"
@@ -1121,6 +1143,7 @@ export default function HandoverClient() {
                     staff: staff || undefined,
                     notes: notes || undefined,
                     createdAt: Date.now(),
+                    clothType: clothType || undefined,
                   });
                   void navigator.clipboard.writeText(txt);
                 }}
@@ -1139,6 +1162,7 @@ export default function HandoverClient() {
                 staff: staff || undefined,
                 notes: notes || undefined,
                 createdAt: Date.now(),
+                clothType: clothType || undefined,
               })}
               rows={8}
               className="mt-1 w-full rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm"

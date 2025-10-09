@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
-
 type Props = { id: string };
 
 export default function PrintClient({ id }: Props) {
@@ -289,8 +288,8 @@ const styles = `
   .layout-stack .photos-section{ display:flex; flex-direction:column; }
   .photos-box.no-photos{ display:flex; align-items:center; justify-content:center; min-height:120px; }
   .decl-box{ margin-top:14px; }
-  .signature-line{ margin-top:18px; display:flex; align-items:center; gap:12px; }
-  .signature-line .sig-label{ font-size:13px; color:#444; min-width:140px; }
+  .signature-line{ margin-top:1px; display:flex; align-items:center; gap:12px; }
+  .signature-line .sig-label{ font-size:12px; color:#444; min-width:140px; }
   .signature-line .sig-box{ flex:1; height:40px; border-bottom:1px solid #bbb; }
   .small{ font-size:13px; }
   .photos-box{ flex:0 0 auto; display:flex; flex-direction:column; }
@@ -303,7 +302,7 @@ const styles = `
   h1{ font-size:13px; margin:0 0 10px; font-weight:700; letter-spacing:.5px; }
   h2{ font-size:13px; margin:10px 0 6px; font-weight:600; }
   .header{ margin-bottom:10px; padding:6px 8px; background:#f7f7f9; border:1px solid #e2e2e6; border-radius:6px; }
-  .header .company{ font-weight:700; font-size:13px; }
+  .header .company{ font-weight:700; font-size:12px; }
   .row{ margin:4px 0; font-size:13px; }
   .row-duo{ display:flex; flex-wrap:wrap; gap:28px; align-items:flex-start; }
   .row-duo .field{ display:flex; align-items:baseline; gap:6px; }
@@ -326,7 +325,7 @@ const styles = `
   .box h2 + p{ margin-top:4px; }
   @media print {
     nav, header { display:none !important; }
-    .photos-box .grid{ gap:8px; }
+    .photos-box .grid{ gap:2px; }
     /* Keep stacked layout in portrait */
     .layout-stack { flex-direction:column !important; }
   }
@@ -525,7 +524,7 @@ function buildHTML(
   )}</strong> cu următoarele caracteristici: <strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
     <p>Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.</p>
     <p>Predarea se face strict pe răspunderea mea și în baza declarațiilor mele.</p>
-    <p>Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului <strong>${esc(
+    <p>Aceasta este declarația pe care o dau, o semnez și o susțin în fața lui <strong>${esc(
       staffText
     )}</strong>, reprezentant al Zebra Music Production s.r.l..</p>
   `;
@@ -600,5 +599,5 @@ function buildHTML(
           r.staff
         )}</span></div>`
       : ""
-  }\n        <div class="box decl-box">${declarationBlock}</div>\n        <div class="signature-line"><span class="sig-label">Semnătură / Signature</span><div class="sig-box"></div></div>\n      </div>\n      <div class="photos-section">${photos}</div>\n    </div>\n  `;
+  }\n        <div class="box decl-box">${declarationBlock}</div>\n        <div class="signature-line"><span class="sig-label">Semnătură / Signature + Bon/Tag</span><div class="sig-box"></div></div>\n      </div>\n      <div class="photos-section">${photos}</div>\n    </div>\n  `;
 }

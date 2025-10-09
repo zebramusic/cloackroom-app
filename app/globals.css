@@ -1,3 +1,7 @@
+.pdf-mode .header.header-inline,
+.pdf-mode .header.header-inline span {
+  font-size: 12px !important;
+}
 @import "tailwindcss";
 
 :root {
@@ -59,40 +63,91 @@ body {
 }
 
 /* PDF: Prevent page breaks, enforce single-page layout for handover print */
+.pdf-mode .header.header-inline {
+  font-size: 12px;
+}
 .pdf-mode .single-page-grid {
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  padding: 8px 0 !important;
   page-break-inside: avoid;
   break-inside: avoid;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  min-height: 1px;
-  max-height: 80vh;
+  aspect-ratio: 210/297;
+  width: 100vw;
+  max-width: 100vw;
+  height: auto;
+  max-height: 100vh;
   overflow: hidden;
-  /* Scale down if content overflows for print/PDF */
   position: relative;
+  box-sizing: border-box;
+  /* Responsive scale for mobile */
+  transform: scale(1);
+}
+.pdf-mode .single-page-grid * {
+  line-height: 1.2 !important;
+}
+.pdf-mode .single-page-grid > .text-section,
+.pdf-mode .single-page-grid > .photos-section {
+  margin: 0 !important;
+  padding: 4px 0 !important;
+}
+.pdf-mode .single-page-grid h1,
+.pdf-mode .single-page-grid h2,
+.pdf-mode .single-page-grid .row,
+.pdf-mode .single-page-grid .box,
+.pdf-mode .single-page-grid .signature-line {
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+@media (max-width: 600px) {
+  .pdf-mode .single-page-grid {
+    width: 100vw;
+    max-width: 100vw;
+    height: auto;
+    max-height: 100vh;
+    transform: scale(0.85);
+    transform-origin: top left;
+  }
 }
 
 @media print {
   .pdf-mode .single-page-grid {
-  width: 210mm;
-  min-height: 270mm;
-  max-height: 271mm;
-  overflow: visible;
-  /* Restrict print PDF to 80% of A4 paper */
-  transform: scale(0.6);
-  transform-origin: top left;
+    width: 210mm;
+    height: 297mm;
+    max-width: 210mm;
+    max-height: 297mm;
+    overflow: hidden;
+    box-sizing: border-box;
+    page-break-after: avoid;
+    page-break-before: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    /* Scale to 90% of A4 page */
+    transform: scale(0.9);
+    transform-origin: top left;
   }
   .pdf-mode .text-section,
   .pdf-mode .photos-section {
-    overflow: visible;
     max-height: none;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .pdf-mode .photos-section {
+    max-height: 45%;
+    overflow: hidden;
   }
   .pdf-mode img {
     object-fit: contain;
     width: 100%;
     height: auto;
     max-width: 100%;
-    max-height: none;
+    max-height: 100%;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
 .pdf-mode .text-section,
