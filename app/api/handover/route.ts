@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
           { fullName: { $regex: q, $options: "i" } },
           { phone: { $regex: q, $options: "i" } },
           { eventName: { $regex: q, $options: "i" } },
+          { clothType: { $regex: q, $options: "i" } },
         ],
       });
     }
@@ -67,7 +68,8 @@ export async function GET(req: NextRequest) {
           r.coatNumber.toLowerCase().includes(qLower) ||
           r.fullName.toLowerCase().includes(qLower) ||
           (r.phone || "").toLowerCase().includes(qLower) ||
-          (r.eventName || "").toLowerCase().includes(qLower)
+          (r.eventName || "").toLowerCase().includes(qLower) ||
+          (r.clothType || "").toLowerCase().includes(qLower)
         )
       )
         return false;
@@ -87,6 +89,8 @@ export async function POST(req: NextRequest) {
     id: body.id,
     coatNumber: String(body.coatNumber),
     fullName: String(body.fullName),
+    eventId: body.eventId ? String(body.eventId) : undefined,
+    eventName: body.eventName ? String(body.eventName) : undefined,
     phone: body.phone ? String(body.phone) : undefined,
     phoneVerified:
       body.phone && typeof body.phoneVerified === "boolean"
@@ -103,6 +107,8 @@ export async function POST(req: NextRequest) {
     email: body.email ? String(body.email) : undefined,
     staff: body.staff ? String(body.staff) : undefined,
     notes: body.notes ? String(body.notes) : undefined,
+    clothType: body.clothType ? String(body.clothType) : undefined,
+    language: body.language === "ro" || body.language === "en" ? body.language : undefined,
     photos: Array.isArray(body.photos)
       ? body.photos.filter((p): p is string => typeof p === "string")
       : undefined,

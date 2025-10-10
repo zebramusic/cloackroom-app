@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
+
 type Props = { id: string };
 
 export default function PrintClient({ id }: Props) {
@@ -10,8 +11,8 @@ export default function PrintClient({ id }: Props) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [shouldOpenPdf, setShouldOpenPdf] = useState(false);
   const [shouldAutoPrint, setShouldAutoPrint] = useState(false);
-  const [forceLandscape, setForceLandscape] = useState(false); // can be enabled via ?orientation=landscape
-  const [maxDim, setMaxDim] = useState(1600); // adjustable via ?quality=low|high
+  const [forceLandscape, setForceLandscape] = useState(false);
+  const [maxDim, setMaxDim] = useState(1600);
   const [lang, setLang] = useState<"ro" | "en">("ro");
   const userChangedLang = useRef(false);
 
@@ -31,7 +32,6 @@ export default function PrintClient({ id }: Props) {
     void load();
   }, [id]);
 
-  // Optimize photos (downscale + EXIF orientation normalization + optional landscape rotation + watermark)
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -45,7 +45,7 @@ export default function PrintClient({ id }: Props) {
           downscaleImage(p, maxDim, maxDim, maxDim > 1600 ? 0.92 : 0.85, {
             forceLandscape,
             createdAt: new Date(data.createdAt),
-            watermark: timestamp, // basic timestamp watermark
+            watermark: timestamp,
           })
         )
       );
@@ -62,7 +62,6 @@ export default function PrintClient({ id }: Props) {
     [data, optimizedPhotos, lang]
   );
 
-  // PDF generator types and function (defined before any early return to keep hook order stable)
   type Html2Pdf = {
     from: (el: Element) => Html2Pdf;
     set: (opts: Record<string, unknown>) => Html2Pdf;
@@ -91,7 +90,6 @@ export default function PrintClient({ id }: Props) {
       }
       const el = contentRef.current;
       if (!el || !data) return;
-      // enlarge images while generating PDF
       el.classList.add("pdf-mode");
       if (!factory) {
         window.print();
@@ -135,7 +133,6 @@ export default function PrintClient({ id }: Props) {
     }
   }, [data, isJsPDF]);
 
-  // Detect mode from query param and trigger appropriate action
   useEffect(() => {
     const usp = new URLSearchParams(window.location.search);
     setShouldOpenPdf(usp.get("open") === "pdf");
@@ -159,13 +156,12 @@ export default function PrintClient({ id }: Props) {
     }
   }, [data]);
 
-  // Auto-open print or PDF depending on mode
   useEffect(() => {
     if (!data || !shouldAutoPrint) return;
     const t = setTimeout(() => {
       if (shouldOpenPdf) void downloadPdf();
       else window.print();
-    }, 200); // small delay so buttons are focusable briefly
+    }, 200);
     return () => clearTimeout(t);
   }, [data, shouldAutoPrint, shouldOpenPdf, downloadPdf]);
 
@@ -185,7 +181,7 @@ export default function PrintClient({ id }: Props) {
       />
       <div className="flex items-center justify-between gap-4 print:hidden mb-4 z-10">
         <Link
-          href="/private/handover"
+          href="/private/handovers"
           className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           aria-label="Back to Handover"
         >
@@ -330,6 +326,7 @@ const styles = `
     .layout-stack { flex-direction:column !important; }
   }
   .pdf-mode .photos-box .grid{ gap:8px; }
+  .decl-box, .decl-box * { font-size: 11px !important; }
 `;
 
 function esc(s: string) {
@@ -344,7 +341,7 @@ function esc(s: string) {
 interface DownscaleOptions {
   forceLandscape?: boolean;
   createdAt?: string | Date;
-  watermark?: string; // text watermark
+  watermark?: string;
 }
 
 async function downscaleImage(
@@ -521,12 +518,11 @@ function buildHTML(
       r.fullName
     )}</strong>, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. <strong>${esc(
     r.coatNumber
-  )}</strong> cu următoarele caracteristici: <strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
+  )}</strong> cu următoarele caracteristici: ${
+    r.clothType ? `<strong>Tip articol:</strong> ${esc(r.clothType)}, ` : ""
+  }<strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
     <p>Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.</p>
-    <p>Predarea se face strict pe răspunderea mea și în baza declarațiilor mele.</p>
-    <p>Aceasta este declarația pe care o dau, o semnez și o susțin în fața lui <strong>${esc(
-      staffText
-    )}</strong>, reprezentant al Zebra Music Production s.r.l..</p>
+    <p>Predarea se face strict pe răspunderea mea și în baza declarațiilor mele. Aceasta este declarația pe care o dau, o semnez și o susțin în fața lui <strong>Gabriel Ursache</strong>, reprezentant al Zebra Music Production s.r.l..</p>
   `;
 
   const bodyEN = `
@@ -535,27 +531,28 @@ function buildHTML(
       r.fullName
     )}</strong>, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. <strong>${esc(
     r.coatNumber
-  )}</strong> with the following characteristics: <strong>${descriere}</strong>, without presenting the ticket received at deposit, as I declare I have lost it.</p>
+  )}</strong> with the following characteristics: ${
+    r.clothType ? `<strong>Item type:</strong> ${esc(r.clothType)}, ` : ""
+  }<strong>${descriere}</strong>, without presenting the ticket received at deposit, as I declare I have lost it.</p>
     <p>I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.</p>
-    <p>The handover is made strictly under my responsibility and based on my statements.</p>
-    <p>This is the statement that I make, sign, and uphold in the presence of <strong>${esc(
-      staffText
-    )}</strong>, representative of Zebra Music Production S.R.L.</p>
+    <p>The handover is made strictly under my responsibility and based on my statements. This is the statement that I make, sign, and uphold in the presence of <strong>Gabriel Ursache</strong>, representative of Zebra Music Production S.R.L.</p>
   `;
 
   const imgs = photosOverride ?? r.photos ?? [];
   const shown = imgs.slice(0, 4);
   const extraCount = Math.max(0, imgs.length - shown.length);
   const photos = shown.length
-    ? `<div class="photos-box box photos-count-${
-        shown.length
-      }">\n        <div class="photos-heading">Fotografii / Photos</div>\n        <div class="grid !grid-cols-2">\n          ${shown
-        .map((p, i) => `<img src="${p}" alt="photo-${i}" />`)
-        .join("")}\n        </div>\n        ${
-        extraCount
-          ? `<div class="muted" style="margin-top:6px">+${extraCount} alte fotografii / more photos</div>`
-          : ""
-      }\n      </div>`
+    ? `<div class="photos-box box photos-count-${shown.length}">
+        <div class="photos-heading">Fotografii / Photos</div>
+        <div class="grid !grid-cols-2">
+          ${shown.map((p, i) => `<img src="${p}" alt="photo-${i}" />`).join("")}
+        </div>
+        ${
+          extraCount
+            ? `<div class="muted" style="margin-top:6px">+${extraCount} alte fotografii / more photos</div>`
+            : ""
+        }
+      </div>`
     : `<div class="photos-box box no-photos"><div class="muted">(Fără fotografii / No photos)</div></div>`;
 
   let phoneField = "";
@@ -575,29 +572,62 @@ function buildHTML(
     lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
 
   return `
-    <div class="single-page-grid">\n      <div class="text-section">\n        <div class="header header-inline">\n          <span class="company">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>\n          <span class="sep">|</span>\n          <span class="muted small">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>\n          <span class="sep">|</span>\n          <span class="muted small">Tel: 0751292540</span>\n        </div>\n        <h1>${title}</h1>\n        <div class="row row-duo">\n          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
-    r.createdAt
-  ).toLocaleString()}</strong></span>\n          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
-    r.coatNumber
-  )}</strong></span>\n        </div>\n        <div class="row row-multi">\n          <span class="field"><span class="label">Nume / Name</span><strong>${esc(
-    r.fullName
-  )}</strong></span>\n          ${phoneField}\n          ${
-    r.email
-      ? `<span class=\"field\"><span class=\"label\">Email</span><span>${esc(
-          r.email
-        )}</span></span>`
-      : ""
-  }\n        </div>\n        ${
-    r.eventName || r.eventId
-      ? `<div class=\"row\"><span class=\"label\">Eveniment / Event</span><span>${esc(
-          r.eventName || r.eventId || ""
+    <div class="single-page-grid">
+      <div class="text-section">
+        <div class="header header-inline">
+          <span class="company">S.C. ZEBRA MUSIC PRODUCTION S.R.L.</span>
+          <span class="sep">|</span>
+          <span class="muted small">CUI: RO45474152&nbsp;|&nbsp;J04/75/2022</span>
+          <span class="sep">|</span>
+          <span class="muted small">Tel: 0751292540</span>
+        </div>
+        <h1>${title}</h1>
+  ${
+    r.clothType
+      ? `<div class="row"><span class="label">Tip articol:</span><span>${esc(
+          r.clothType
         )}</span></div>`
       : ""
-  }\n        ${
-    r.staff
-      ? `<div class=\"row\"><span class=\"label\">Personal / Staff</span><span>${esc(
+  }
+        <div class="row row-duo">
+          <span class="field"><span class="label">Data / Date</span><strong>${new Date(
+            r.createdAt
+          ).toLocaleString()}</strong></span>
+          <span class="field"><span class="label">Tichet / Ticket</span><strong>${esc(
+            r.coatNumber
+          )}</strong></span>
+        </div>
+        <div class="row row-multi">
+          <span class="field"><span class="label">Nume / Name</span><strong>${esc(
+            r.fullName
+          )}</strong></span>
+          ${phoneField}
+          ${
+            r.email
+              ? `<span class="field"><span class="label">Email</span><span>${esc(
+                  r.email
+                )}</span></span>`
+              : ""
+          }
+        </div>
+        ${
+          r.eventName || r.eventId
+            ? `<div class="row"><span class="label">Eveniment / Event</span><span>${esc(
+                r.eventName || r.eventId || ""
+              )}</span></div>`
+            : ""
+        }
+        ${
           r.staff
-        )}</span></div>`
-      : ""
-  }\n        <div class="box decl-box">${declarationBlock}</div>\n        <div class="signature-line"><span class="sig-label">Semnătură / Signature + Bon/Tag</span><div class="sig-box"></div></div>\n      </div>\n      <div class="photos-section">${photos}</div>\n    </div>\n  `;
+            ? `<div class="row"><span class="label">Personal / Staff</span><span>${esc(
+                r.staff
+              )}</span></div>`
+            : ""
+        }
+        <div class="box decl-box">${declarationBlock}</div>
+        <div class="signature-line"><span class="sig-label">Semnătură / Signature + Bon/Tag</span><div class="sig-box"></div></div>
+      </div>
+      <div class="photos-section">${photos}</div>
+    </div>
+  `;
 }
