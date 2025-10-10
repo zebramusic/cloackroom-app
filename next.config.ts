@@ -1,6 +1,8 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+const nextConfig = {
+  // Explicitly set Turbopack root to this workspace to avoid lockfile root warnings
+  turbopack: {
+    root: __dirname,
+  },
   async redirects() {
     return [
       {
