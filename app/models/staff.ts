@@ -4,6 +4,7 @@ export interface StaffUser {
   email: string;
   passwordHash: string;
   isAuthorized: boolean; // whether the staff account is allowed to sign in and handle handovers
+  authorizedEventId?: string; // staff is authorized to operate for this active event only
   createdAt: number;
 }
 

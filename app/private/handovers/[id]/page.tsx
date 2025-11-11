@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import type { HandoverReport } from "@/app/models/handover";
 import { getDb } from "@/lib/mongodb";
+import { getSessionUser, SESS_COOKIE } from "@/lib/auth";
+import { isEventActive } from "@/app/models/event";
+import type { Event } from "@/app/models/event";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import PhotosGallery from "./PhotosGallery";
 import SignedDocClient from "./signed/SignedDocClient";
@@ -28,6 +32,35 @@ export default async function HandoverDetailPage({ params }: Props) {
   const report = await load(awaited.id);
   if (!report) {
     notFound();
+  }
+
+  // RBAC: Only allow staff to view handovers belonging to their authorized and currently active event
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (me && me.type === "staff") {
+    if (!me.isAuthorized || !me.authorizedEventId) {
+      notFound();
+    }
+    const db2 = await getDb();
+    if (!db2) {
+      notFound();
+    }
+    const ev = await db2
+      .collection<Event>("events")
+      .findOne({ id: me.authorizedEventId });
+    if (!ev || !isEventActive(ev)) {
+      notFound();
+    }
+    // Allow legacy docs without eventId if created during the active event window
+    const withinWindow =
+      report.createdAt >= ev.startsAt && report.createdAt <= ev.endsAt;
+    if (report.eventId && report.eventId !== me.authorizedEventId) {
+      notFound();
+    }
+    if (!report.eventId && !withinWindow) {
+      notFound();
+    }
   }
 
   const created = new Date(report.createdAt);

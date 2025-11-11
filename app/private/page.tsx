@@ -57,7 +57,7 @@ export default async function PrivateHome() {
       <script
         // Hide admin-only cards for non-admin users client-side after role fetch
         dangerouslySetInnerHTML={{
-          __html: `(() => {fetch('/api/auth/me',{cache:'no-store'}).then(r=>r.json()).then(j=>{if(!j?.user||j.user.type!=='admin'){document.querySelectorAll('[data-admin-only="true"]').forEach(el=>el.remove());}}).catch(()=>{});})();`,
+          __html: `(() => {fetch('/api/auth/me',{cache:'no-store',credentials:'include'}).then(r=>r.json()).then(j=>{if(!j?.user||j.user.type!=='admin'){document.querySelectorAll('[data-admin-only="true"]').forEach(el=>el.remove());}}).catch(()=>{});})();`,
         }}
       />
     </main>

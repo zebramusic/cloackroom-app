@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useToast } from "@/app/private/toast/ToastContext";
 import { useRouter } from "next/navigation";
 
@@ -129,14 +130,14 @@ export default function SignedDocClient({
       {value ? (
         <div className="flex flex-col gap-4">
           <div className="flex gap-2 flex-wrap">
-            <a
-              href={value}
+            <Link
+              href={`/private/handovers/${encodeURIComponent(id)}/signed`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs rounded-full border border-border px-3 py-1 hover:bg-muted"
             >
               Open Signed
-            </a>
+            </Link>
             <label className="text-xs rounded-full border border-border px-3 py-1 cursor-pointer hover:bg-muted">
               <input
                 type="file"
@@ -279,7 +280,7 @@ function fileToJpegDataUrl(
           ctx.drawImage(img, 0, 0, w, h);
           const out = canvas.toDataURL("image/jpeg", quality);
           resolve(out);
-        } catch (e) {
+        } catch {
           resolve(reader.result as string);
         }
       };

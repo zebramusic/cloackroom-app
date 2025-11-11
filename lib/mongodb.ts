@@ -29,7 +29,7 @@ type MongoCache = {
 };
 
 declare global {
-  var __mongoCache: MongoCache | undefined; // eslint-disable-line no-var
+  var __mongoCache: MongoCache | undefined;
 }
 
 const cache: MongoCache = globalThis.__mongoCache || { client: null, db: null };

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/app/private/toast/ToastContext";
 import Image from "next/image";
 import { useLocale } from "@/app/providers/LocaleProvider";
@@ -25,17 +25,30 @@ export default function LostClient() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const fetchClaims = useCallback(
+    async (query: string) => {
+      try {
+        const res = await fetch(`/api/lost?q=${encodeURIComponent(query)}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || "Failed to load lost claims");
+        }
+        const json = (await res.json()) as { items: LostClaim[] };
+        setClaims(json.items);
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Failed to load lost claims";
+        push({ message, variant: "error" });
+      }
+    },
+    [push]
+  );
+
   useEffect(() => {
     void fetchClaims("");
-  }, []);
-
-  async function fetchClaims(query: string) {
-    const res = await fetch(`/api/lost?q=${encodeURIComponent(query)}`, {
-      cache: "no-store",
-    });
-    const json = (await res.json()) as { items: LostClaim[] };
-    setClaims(json.items);
-  }
+  }, [fetchClaims]);
 
   async function startCamera() {
     try {
@@ -103,11 +116,15 @@ export default function LostClient() {
         photos,
         createdAt: Date.now(),
       };
-      await fetch(`/api/lost`, {
+      const res = await fetch(`/api/lost`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(claim),
       });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Failed to submit claim");
+      }
       // reset
       setFullName("");
       setAddress1("");
@@ -120,22 +137,50 @@ export default function LostClient() {
       setPhotos([]);
       await fetchClaims("");
       push({ message: t("lost.submitted"), variant: "success" });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to submit claim";
+      push({ message, variant: "error" });
     } finally {
       setSubmitting(false);
     }
   }
 
   async function resolveClaim(id: string, resolved: boolean) {
-    await fetch(`/api/lost`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, resolved }),
-    });
-    await fetchClaims(q);
+    try {
+      const res = await fetch(`/api/lost`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, resolved }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Failed to update claim");
+      }
+      await fetchClaims(q);
+      push({
+        message: resolved ? t("lost.resolvedFlash") : t("lost.reopenedFlash"),
+        variant: "success",
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to update claim";
+      push({ message, variant: "error" });
+    }
   }
   async function deleteClaim(id: string) {
-    await fetch(`/api/lost?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    await fetchClaims(q);
+    try {
+      const res = await fetch(`/api/lost?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Failed to delete claim");
+      }
+      await fetchClaims(q);
+      push({ message: t("lost.deletedFlash"), variant: "success" });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to delete claim";
+      push({ message, variant: "error" });
+    }
   }
 
   return (

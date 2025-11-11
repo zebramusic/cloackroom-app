@@ -1,30 +1,28 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
-import type { Event } from "@/app/models/event";
+import type { Product } from "@/app/models/product";
 import { isEventActive } from "@/app/models/event";
-
-type Health = {
-  ok: boolean;
-  mongo?: { connected: boolean; sampleCount?: number };
-};
+import { useEvents } from "@/app/hooks/useEvents";
 
 export default function AdminClient() {
-  const [health, setHealth] = useState<Health | null>(null);
   const [handovers, setHandovers] = useState<HandoverReport[] | null>(null);
   const [staffUsers, setStaffUsers] = useState<number | null>(null);
   const [adminUsers, setAdminUsers] = useState<number | null>(null);
-  const [events, setEvents] = useState<Event[] | null>(null);
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const {
+    data: events,
+    error: eventsError,
+    isLoading: eventsLoading,
+  } = useEvents();
+  const activeEventsCount = useMemo(
+    () => events.filter((event) => isEventActive(event)).length,
+    [events]
+  );
 
   useEffect(() => {
     void (async () => {
-      try {
-        const h = await fetch("/api/health", { cache: "no-store" }).then((r) =>
-          r.json()
-        );
-        setHealth(h as Health);
-      } catch {}
       try {
         const hs = await fetch("/api/handover?q=", { cache: "no-store" }).then(
           (r) => r.json()
@@ -44,41 +42,27 @@ export default function AdminClient() {
         setAdminUsers(Array.isArray(ad.items) ? ad.items.length : 0);
       } catch {}
       try {
-        const ev = await fetch("/api/events", { cache: "no-store" }).then((r) =>
-          r.json()
-        );
-        setEvents(Array.isArray(ev.items) ? (ev.items as Event[]) : []);
+        const pr = await fetch("/api/products?all=1", {
+          cache: "no-store",
+        }).then((r) => r.json());
+        setProducts(Array.isArray(pr.items) ? (pr.items as Product[]) : []);
       } catch {}
     })();
   }, []);
 
-  const mongoStatus = health?.mongo?.connected ? "Connected" : "Not connected";
+  useEffect(() => {
+    if (eventsError) console.error(eventsError);
+  }, [eventsError]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
       <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Environment and data overview. Use this to verify database status and
-        review recent items.
+        Environment and data overview. Review recent items and access management
+        tools.
       </p>
 
       <div className="mt-6 grid gap-6 md:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="text-sm text-muted-foreground">MongoDB</div>
-          <div className="mt-1 text-xl font-semibold">{mongoStatus}</div>
-          {health?.mongo?.connected ? (
-            <div className="mt-1 text-sm text-muted-foreground">
-              Sample query ok
-              {typeof health.mongo.sampleCount === "number"
-                ? `, count=${health.mongo.sampleCount}`
-                : ""}
-            </div>
-          ) : (
-            <div className="mt-1 text-sm text-muted-foreground">
-              Check .env → MONGODB_URI
-            </div>
-          )}
-        </div>
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="text-sm text-muted-foreground">Handovers</div>
           <div className="mt-1 text-xl font-semibold">
@@ -129,10 +113,14 @@ export default function AdminClient() {
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="text-sm text-muted-foreground">Events</div>
           <div className="mt-1 text-xl font-semibold flex items-baseline gap-2">
-            {events ? events.length : "—"}
-            {events && (
+            {eventsLoading && events.length === 0
+              ? "…"
+              : eventsError
+              ? "—"
+              : events.length}
+            {events.length > 0 && (
               <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                {events.filter((e) => isEventActive(e)).length} active
+                {activeEventsCount} active
               </span>
             )}
           </div>
@@ -142,6 +130,25 @@ export default function AdminClient() {
               className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted inline-block"
             >
               Manage Events
+            </Link>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="text-sm text-muted-foreground">Products</div>
+          <div className="mt-1 text-xl font-semibold flex items-baseline gap-2">
+            {products ? products.length : "—"}
+            {products && (
+              <span className="text-xs font-medium text-muted-foreground">
+                {products.filter((p) => p.active !== false).length} active
+              </span>
+            )}
+          </div>
+          <div className="mt-2">
+            <Link
+              href="/dashboard/admin/products"
+              className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted inline-block"
+            >
+              Manage Products
             </Link>
           </div>
         </div>

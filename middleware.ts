@@ -27,18 +27,26 @@ export async function middleware(req: NextRequest) {
   if (!cookie) {
     return NextResponse.redirect(new URL("/private/admin/login", req.url));
   }
-  // Staff restriction: if role cookie says staff and path is not within /handover, block.
+  // Staff restriction: staff cannot access /private/admin/*
   const role = req.cookies.get("cloack_role")?.value;
   if (role === "staff" && pathname.startsWith("/private/admin")) {
     if (pathname !== "/not-allowed") {
       return NextResponse.rewrite(new URL("/not-allowed", req.url));
     }
   }
-  // NOTE: Middleware runs on the Edge runtime (no Node 'crypto' / native modules).
-  // Avoid hitting MongoDB here (driver requires Node APIs and was causing runtime errors).
-  // We perform only a lightweight presence check for the session cookie.
-  // Deeper validation (token expiry / user existence) should happen in server components or API routes.
-  // If stronger protection is needed, implement a signed/JWT cookie or move validation to a shared layout.
+
+  // Event-level authorization for staff: only allow /private/handover and /private/handovers
+  if (role === "staff") {
+    const allowed =
+      pathname === "/private" ||
+      pathname.startsWith("/private/handover") ||
+      pathname.startsWith("/private/handovers") ||
+      pathname === "/not-allowed";
+    if (!allowed) {
+      return NextResponse.rewrite(new URL("/not-allowed", req.url));
+    }
+  }
+  // NOTE: Middleware runs on the Edge runtime. We perform minimal checks and only light DB reads.
   return NextResponse.next();
 }
 

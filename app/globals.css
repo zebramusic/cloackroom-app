@@ -1,3 +1,16 @@
+/* Ensure all buttons show a pointer cursor; keep disabled buttons as not-allowed */
+button,
+input[type="button"],
+input[type="submit"],
+[role="button"] {
+  cursor: pointer;
+}
+button[disabled],
+input[type="button"][disabled],
+input[type="submit"][disabled],
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
 .pdf-mode .header.header-inline,
 .pdf-mode .header.header-inline span {
   font-size: 12px !important;
@@ -31,24 +44,38 @@
   --color-accent-foreground: var(--accent-foreground);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --card: #0f0f10;
-    --card-foreground: #e5e7eb;
-    --muted: #111113; /* near zinc-950 */
-    --muted-foreground: #a1a1aa; /* zinc-400 */
-    --border: #27272a; /* zinc-800 */
-    --accent: #8b5cf6; /* violet-500 */
-    --accent-foreground: #0a0a0a;
-  }
-}
+/* lock theme regardless of system preference */
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.landing-theme {
+  --background: #040611;
+  --foreground: #f8fafc;
+  --card: rgba(7, 12, 24, 0.78);
+  --card-foreground: #f8fafc;
+  --muted: rgba(148, 163, 184, 0.12);
+  --muted-foreground: rgba(226, 232, 240, 0.7);
+  --border: rgba(148, 163, 184, 0.28);
+  --accent: #38bdf8;
+  --accent-foreground: #020617;
+  color-scheme: dark;
+}
+
+.private-theme {
+  --background: #070b14;
+  --foreground: #f8fafc;
+  --card: rgba(12, 18, 30, 0.9);
+  --card-foreground: #f8fafc;
+  --muted: rgba(148, 163, 184, 0.12);
+  --muted-foreground: rgba(203, 213, 225, 0.72);
+  --border: rgba(148, 163, 184, 0.32);
+  --accent: #38bdf8;
+  --accent-foreground: #04101f;
+  color-scheme: dark;
 }
 
 /* Accessibility: focus-visible outline */
@@ -168,4 +195,34 @@ a[aria-current="page"] {
   text-decoration: underline;
   text-underline-offset: 4px;
   font-weight: 600;
+}
+
+/* Subtle float animations for hero badges */
+@keyframes float-slow {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+@keyframes float-fast {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+.animate-float-fast {
+  animation: float-fast 4s ease-in-out infinite;
 }

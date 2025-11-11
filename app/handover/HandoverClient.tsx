@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useToast } from "@/app/private/toast/ToastContext";
 import Image from "next/image";
 import type { HandoverReport } from "@/app/models/handover";
 import type { Event } from "@/app/models/event";
 import { isEventActive } from "@/app/models/event";
+import { useEvents } from "@/app/hooks/useEvents";
 
 type TemplateInput = {
   coatNumber: string;
@@ -27,7 +28,7 @@ function buildDeclarationRO(t: TemplateInput) {
     "Declarație pe propria răspundere",
     `Subsemnatul(a) ${t.fullName}, cunoscând prevederile Codului penal în materia falsului, uzului de fals și a înșelăciunii, revendic pe propria răspundere bunul aferent tichetului nr. ${t.coatNumber} cu următoarele caracteristici: ${clothTypeText} ${descriere}, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.`,
     "Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.",
-    "Predarea se face strict pe răspunderea mea și în baza declarațiilor mele. Aceasta este declarația pe care o dau, o semnez și o susțin în fața domnului Gabriel Ursache, reprezentant al Zebra Music Production s.r.l..",
+    `Predarea se face strict pe răspunderea mea și în baza declarațiilor mele. Aceasta este declarația pe care o dau, o semnez și o susțin în fața ${staffText}, reprezentant al Zebra Music Production s.r.l..`,
     `Data: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
   ];
   return lines.filter(Boolean).join("\n\n");
@@ -43,7 +44,7 @@ function buildDeclarationEN(t: TemplateInput) {
     "Self-Declaration",
     `I, ${t.fullName}, being aware of the provisions of the Criminal Code regarding forgery, use of forgery and fraud, claim, on my own responsibility, the item corresponding to ticket no. ${t.coatNumber}, with the following characteristics: ${clothTypeText} ${descriere}, without presenting the ticket received at deposit, as I declare I have lost it.`,
     "I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.",
-    "The handover is made strictly under my responsibility and based on my statements. This is the statement that I make, sign, and uphold in the presence of Mr. Gabriel Ursache, representative of Zebra Music Production S.R.L.",
+    `The handover is made strictly under my responsibility and based on my statements. This is the statement that I make, sign, and uphold in the presence of ${staffText}, representative of Zebra Music Production S.R.L.`,
     `Date: ${new Date(t.createdAt ?? Date.now()).toLocaleString()}`,
   ];
   return lines.filter(Boolean).join("\n\n");
@@ -61,19 +62,25 @@ export default function HandoverClient() {
   const [notes, setNotes] = useState("");
   const [clothType, setClothType] = useState("");
   const [language, setLanguage] = useState<"ro" | "en">("ro");
-  const [type, setType] = useState<string>("");
-  const [events, setEvents] = useState<Event[]>([]);
-  const [activeEvents, setActiveEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const coatRef = useRef<HTMLInputElement>(null);
-  const [me, setMe] = useState<{ fullName: string; type?: string } | null>(
-    null
-  );
+  const [me, setMe] = useState<{
+    fullName: string;
+    type?: string;
+    authorizedEventId?: string;
+  } | null>(null);
+  const { data: events, error: eventsError } = useEvents({
+    refreshInterval: 60000,
+  });
+  const activeEvents = useMemo(() => {
+    if (!events.length) return [] as Event[];
+    const now = Date.now();
+    return events.filter((event) => isEventActive(event, now));
+  }, [events]);
   const [submitting, setSubmitting] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -163,13 +170,12 @@ export default function HandoverClient() {
 
   function stopCamera() {
     videoRef.current?.pause();
-    (streamRef.current || stream)?.getTracks().forEach((tr) => tr.stop());
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
     streamRef.current = null;
-    setStream(null);
     setCameraOpen(false);
     activeDeviceIdRef.current = null;
   }
-  async function refreshDevices() {
+  const refreshDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -184,7 +190,7 @@ export default function HandoverClient() {
     } catch (e) {
       console.error(e);
     }
-  }
+  }, [selectedDeviceId]);
   const startCamera = useCallback(async () => {
     // If the camera is already open with the same device, skip restart to reduce flicker
     if (
@@ -218,9 +224,8 @@ export default function HandoverClient() {
       };
       const s = await navigator.mediaDevices.getUserMedia(constraints);
       // Stop prior stream tracks before replacing
-      (streamRef.current || stream)?.getTracks().forEach((tr) => tr.stop());
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
       streamRef.current = s;
-      setStream(s);
       if (videoRef.current) {
         const el = videoRef.current as HTMLVideoElement & {
           srcObject?: MediaStream;
@@ -274,13 +279,13 @@ export default function HandoverClient() {
     } finally {
       startingCameraRef.current = false;
     }
-  }, [selectedDeviceId, cameraOpen]);
+  }, [cameraOpen, selectedDeviceId]);
 
   // Initial load
   useEffect(() => {
     coatRef.current?.focus();
     void refreshDevices();
-    void fetch("/api/auth/me", { cache: "no-store" })
+    void fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
       .then((r) => r.json())
       .then((j) => {
         if (j?.user?.fullName) setStaff((s) => s || j.user.fullName);
@@ -290,49 +295,44 @@ export default function HandoverClient() {
     const handler = () => void refreshDevices();
     navigator.mediaDevices?.addEventListener?.("devicechange", handler);
     const autoTimer = setTimeout(() => {
-      if (!cameraOpen) void startCamera();
+      void startCamera();
     }, 250);
     return () => {
       clearTimeout(autoTimer);
       navigator.mediaDevices?.removeEventListener?.("devicechange", handler);
     };
-  }, []);
+  }, [refreshDevices, startCamera]);
 
-  // Events polling
   useEffect(() => {
-    let cancelled = false;
-    async function loadEvents() {
-      try {
-        const res = await fetch("/api/events", { cache: "no-store" });
-        const json = (await res.json()) as { items?: Event[] };
-        if (!cancelled && Array.isArray(json.items)) {
-          const all = json.items;
-          all.sort((a, b) => a.startsAt - b.startsAt);
-          setEvents(all);
-          const now = Date.now();
-          const actives = all.filter((e) => isEventActive(e, now));
-          setActiveEvents(actives);
-          if (actives.length === 1) {
-            setSelectedEventId(actives[0].id);
-          } else if (actives.length > 1) {
-            setSelectedEventId((prev) =>
-              prev && actives.some((e) => e.id === prev) ? prev : null
-            );
-          } else {
-            setSelectedEventId(null);
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      }
+    if (!eventsError) return;
+    const message =
+      eventsError instanceof Error
+        ? eventsError.message
+        : "Failed to load events";
+    push({ message, variant: "error" });
+  }, [eventsError, push]);
+
+  useEffect(() => {
+    if (me?.type === "staff" && me.authorizedEventId) {
+      const targetId = me.authorizedEventId ?? null;
+      setSelectedEventId((prev) => (prev === targetId ? prev : targetId));
+      return;
     }
-    void loadEvents();
-    const interval = setInterval(loadEvents, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+    if (activeEvents.length === 1) {
+      const only = activeEvents[0];
+      setSelectedEventId((prev) => (prev === only.id ? prev : only.id));
+      return;
+    }
+    if (activeEvents.length > 1) {
+      setSelectedEventId((prev) =>
+        prev && activeEvents.some((event) => event.id === prev) ? prev : null
+      );
+      return;
+    }
+    setSelectedEventId((prev) =>
+      prev && events.some((event) => event.id === prev) ? prev : null
+    );
+  }, [activeEvents, events, me?.authorizedEventId, me?.type]);
 
   // Re-start camera when device changes
   useEffect(() => {
@@ -377,11 +377,21 @@ export default function HandoverClient() {
         createdAt: Date.now(),
         language,
       };
-      await fetch(`/api/handover`, {
+      const res = await fetch(`/api/handover`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        let msg = "Failed to save handover.";
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j?.error) msg = j.error;
+        } catch {}
+        push({ message: msg, variant: "error" });
+        return;
+      }
+      const saved = (await res.json()) as HandoverReport;
       setCoatNumber("");
       setFullName("");
       setPhone("");
@@ -393,10 +403,15 @@ export default function HandoverClient() {
       setClothType("");
       setPhotos([]);
       try {
-        sessionStorage.setItem(`handover:${id}`, JSON.stringify(payload));
+        sessionStorage.setItem(
+          `handover:${saved.id || id}`,
+          JSON.stringify({ ...payload, id: saved.id || id })
+        );
       } catch {}
       window.open(
-        `/private/handover/print/${encodeURIComponent(id)}?lang=${language}`,
+        `/private/handover/print/${encodeURIComponent(
+          saved.id || id
+        )}?lang=${language}`,
         "_blank",
         "noopener,noreferrer"
       );
@@ -427,6 +442,11 @@ export default function HandoverClient() {
                 <span className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground">
                   No active event
                 </span>
+              ) : me?.type === "staff" && me.authorizedEventId ? (
+                <span className="text-xs rounded-full bg-accent text-accent-foreground px-2 py-0.5">
+                  {events.find((e) => e.id === me.authorizedEventId)?.name ||
+                    "(Unauthorized)"}
+                </span>
               ) : activeEvents.length === 1 ? (
                 <span className="text-xs rounded-full bg-accent text-accent-foreground px-2 py-0.5">
                   {activeEvents[0].name}
@@ -436,6 +456,7 @@ export default function HandoverClient() {
                   value={selectedEventId || ""}
                   onChange={(e) => setSelectedEventId(e.target.value || null)}
                   className="text-xs rounded-full border border-border bg-background px-2 py-1"
+                  disabled={me?.type === "staff"}
                 >
                   <option value="">Select event…</option>
                   {activeEvents.map((ev) => (
@@ -445,6 +466,24 @@ export default function HandoverClient() {
                   ))}
                 </select>
               )}
+              {me?.type === "admin" && activeEvents.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Quick cycle through active events for convenience
+                    if (activeEvents.length === 0) return;
+                    const idx = activeEvents.findIndex(
+                      (e) => e.id === selectedEventId
+                    );
+                    const next = activeEvents[(idx + 1) % activeEvents.length];
+                    setSelectedEventId(next?.id || null);
+                  }}
+                  className="text-xs rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+                  title="Switch active event"
+                >
+                  Switch
+                </button>
+              ) : null}
             </div>
             {selectedEventId && (
               <div className="text-[10px] text-muted-foreground">
@@ -511,7 +550,11 @@ export default function HandoverClient() {
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
+                className={`mt-1 w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 ${
+                  !phoneVerified
+                    ? "border-red-600 focus:ring-red-500 animate-pulse"
+                    : "border-border focus:ring-accent"
+                }`}
                 placeholder="+40 712 345 678"
               />
               {phone ? (

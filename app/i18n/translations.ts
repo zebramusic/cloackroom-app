@@ -9,6 +9,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "navbar.contact": "Contact",
     "navbar.getStarted": "Get started",
     "navbar.switchTo": "Switch language to ",
+  "navbar.confirmSwitchToRomanian": "Switch language to Română?",
+  "navbar.confirmSwitchToEnglish": "Switch language to English?",
 
     "hero.badge": "Introducing Cloackroom",
     "hero.title": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
@@ -71,6 +73,9 @@ export const translations: Record<Locale, Record<string, string>> = {
   "lost.resolve": "Mark resolved",
   "lost.unresolve": "Undo resolved",
   "lost.none": "No claims yet.",
+    "lost.resolvedFlash": "Claim marked resolved",
+    "lost.reopenedFlash": "Claim reopened",
+    "lost.deletedFlash": "Claim deleted",
   },
   ro: {
     "navbar.brand": "Cloackroom",
@@ -80,6 +85,8 @@ export const translations: Record<Locale, Record<string, string>> = {
     "navbar.contact": "Contact",
     "navbar.getStarted": "Începe acum",
     "navbar.switchTo": "Schimbă limba în ",
+  "navbar.confirmSwitchToRomanian": "Schimbi limba în Română?",
+  "navbar.confirmSwitchToEnglish": "Schimbi limba în Engleză?",
 
     "hero.badge": "Prezentăm Cloackroom",
     "hero.title": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
@@ -142,5 +149,8 @@ export const translations: Record<Locale, Record<string, string>> = {
   "lost.resolve": "Marchează rezolvat",
   "lost.unresolve": "Anulează rezolvarea",
   "lost.none": "Nicio cerere momentan.",
+    "lost.resolvedFlash": "Cererea a fost marcată rezolvată",
+    "lost.reopenedFlash": "Cererea a fost redeschisă",
+    "lost.deletedFlash": "Cererea a fost ștearsă",
   },
 };

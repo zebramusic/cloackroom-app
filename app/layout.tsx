@@ -29,10 +29,13 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <ToastProvider>
-          <LocaleProvider>{children}</LocaleProvider>
-          <ToastViewport />
+          <LocaleProvider>
+            {children}
+            <ToastViewport />
+          </LocaleProvider>
         </ToastProvider>
       </body>
     </html>

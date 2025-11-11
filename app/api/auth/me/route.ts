@@ -20,6 +20,6 @@ export async function GET(req: NextRequest) {
   } else {
     const staff = await db.collection<StaffUser>("staff").findOne({ id: sess.staffId });
     if (!staff) return NextResponse.json({ user: null });
-    return NextResponse.json({ user: { id: staff.id, fullName: staff.fullName, email: staff.email, type: "staff", isAuthorized: staff.isAuthorized !== false } });
+    return NextResponse.json({ user: { id: staff.id, fullName: staff.fullName, email: staff.email, type: "staff", isAuthorized: staff.isAuthorized !== false, authorizedEventId: staff.authorizedEventId } });
   }
 }

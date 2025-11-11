@@ -2,10 +2,12 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import type { HandoverReport } from "@/app/models/handover";
 import { getDb } from "@/lib/mongodb";
+import type { Event } from "@/app/models/event";
+import { isEventActive } from "@/app/models/event";
 import { getSessionUser, SESS_COOKIE } from "@/lib/auth";
 
+// In-memory fallback store when no DB is available
 const store: Map<string, HandoverReport> = new Map();
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") || "").trim();
@@ -14,13 +16,63 @@ export async function GET(req: NextRequest) {
   const phone = (searchParams.get("phone") || "").trim();
   const eventId = (searchParams.get("eventId") || "").trim();
   const eventName = (searchParams.get("eventName") || "").trim();
+  // Resolve session and enforce staff scope
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me) {
+    return NextResponse.json({ items: [] }, { status: 401 });
+  }
 
   // Build dynamic filter conditions; empty means no filter for that field
   const db = await getDb();
   if (db) {
+    // If staff, ensure they are authorized and have a bound event; validate that event is active.
+    let staffActiveEvent: Event | null = null;
+    if (me && me.type === "staff") {
+      if (me.isAuthorized === false || !me.authorizedEventId) {
+        return NextResponse.json({ items: [] });
+      }
+      try {
+        const ev = await db
+          .collection<Event>("events")
+          .findOne({ id: me.authorizedEventId });
+        if (ev) {
+          if (!isEventActive(ev, Date.now())) {
+            return NextResponse.json({ items: [] });
+          }
+          staffActiveEvent = ev;
+        }
+        // If event doc is missing, continue with strict eventId filter only (no window allowance)
+      } catch {
+        // On DB error, continue with strict eventId filter only
+      }
+    }
     const col = db.collection<HandoverReport>("handovers");
   // Build MongoDB filter parts with explicit typing to avoid any
   const and: Record<string, unknown>[] = [];
+    // Staff can only view their authorized event (enforced regardless of request filters)
+    if (me && me.type === "staff") {
+      // At this point, we already validated authorizedEventId presence and activity and loaded staffActiveEvent.
+      // Always restrict to the authorized event id
+      if (staffActiveEvent) {
+        // Allow docs explicitly tagged to this event OR legacy docs without eventId but created during the active event window.
+        const ev = staffActiveEvent;
+        and.push({
+          $or: [
+            { eventId: me.authorizedEventId },
+            {
+              $and: [
+                { $or: [ { eventId: { $exists: false } }, { eventId: null }, { eventId: "" } ] },
+                { createdAt: { $gte: ev.startsAt, $lte: ev.endsAt } },
+              ],
+            },
+          ],
+        });
+      } else {
+        // No event doc found: filter strictly by eventId only
+        and.push({ eventId: me.authorizedEventId });
+      }
+    }
     if (eventId) and.push({ eventId });
     if (eventName)
       and.push({ eventName: { $regex: eventName, $options: "i" } });
@@ -51,8 +103,14 @@ export async function GET(req: NextRequest) {
   const coatL = coat.toLowerCase();
   const nameL = name.toLowerCase();
   const phoneL = phone.toLowerCase();
+  // If no DB, we cannot validate event activity reliably; fail closed for staff and unauthenticated (already handled)
+    // If no DB, we cannot validate event activity reliably; allow staff to see only handovers tagged with their authorizedEventId
   const items = Array.from(store.values())
-    .filter((r) => {
+    .filter((r: HandoverReport) => {
+        if (me && me.type === "staff") {
+          if (!me.authorizedEventId) return false;
+          if (r.eventId !== me.authorizedEventId) return false;
+        }
       if (eventId && r.eventId !== eventId) return false;
       if (
         eventName &&
@@ -75,7 +133,7 @@ export async function GET(req: NextRequest) {
         return false;
       return true;
     })
-    .sort((a, b) => b.createdAt - a.createdAt)
+  .sort((a: HandoverReport, b: HandoverReport) => b.createdAt - a.createdAt)
     .slice(0, 300);
   return NextResponse.json({ items });
 }
@@ -85,11 +143,41 @@ export async function POST(req: NextRequest) {
   if (!body?.id || !body.coatNumber || !body.fullName) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
+  const token = req.cookies.get(SESS_COOKIE)?.value;
+  const me = await getSessionUser(token);
+  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (me.type === "staff" && me.isAuthorized === false) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  // Staff can only create within their authorized event
+  if (me.type === "staff") {
+    if (!me.authorizedEventId) {
+      return NextResponse.json({ error: "Not allowed: no event authorization" }, { status: 403 });
+    }
+    // Ensure the authorized event is currently active
+    const db = await getDb();
+    if (db) {
+      const ev = await db.collection<Event>("events").findOne({ id: me.authorizedEventId });
+      if (ev && !isEventActive(ev, Date.now())) {
+        return NextResponse.json({ error: "Event not active" }, { status: 403 });
+      }
+    } else {
+      // Without DB, allow creation; eventId will be pinned to authorizedEventId and stored in-memory.
+    }
+    if (body.eventId && body.eventId !== me.authorizedEventId) {
+      return NextResponse.json({ error: "Not allowed for this event" }, { status: 403 });
+    }
+  }
   const report: HandoverReport = {
     id: body.id,
     coatNumber: String(body.coatNumber),
     fullName: String(body.fullName),
-    eventId: body.eventId ? String(body.eventId) : undefined,
+    eventId:
+      me && me.type === "staff"
+        ? me.authorizedEventId
+        : body.eventId
+        ? String(body.eventId)
+        : undefined,
     eventName: body.eventName ? String(body.eventName) : undefined,
     phone: body.phone ? String(body.phone) : undefined,
     phoneVerified:
@@ -161,9 +249,22 @@ export async function PATCH(req: NextRequest) {
   const token = req.cookies.get(SESS_COOKIE)?.value;
   const me = await getSessionUser(token);
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (me.type === "staff" && me.isAuthorized === false) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   // Allow both staff & admin to attach signed document (capture step after print)
   if (me.type !== "admin" && me.type !== "staff") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  // If staff, ensure the handover belongs to their authorized event
+  if (me.type === "staff") {
+    const db2 = await getDb();
+    if (db2) {
+      const doc = await db2.collection<HandoverReport>("handovers").findOne({ id: body.id });
+      if (doc && me.authorizedEventId && doc.eventId !== me.authorizedEventId) {
+        return NextResponse.json({ error: "Forbidden for this event" }, { status: 403 });
+      }
+    }
   }
   const db = await getDb();
   if (db) {

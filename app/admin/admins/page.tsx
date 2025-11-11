@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/app/private/toast/ToastContext";
 
 type Admin = {
   id: string;
@@ -9,6 +10,7 @@ type Admin = {
 };
 
 export default function AdminsPage() {
+  const { push } = useToast();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(false);
@@ -20,7 +22,7 @@ export default function AdminsPage() {
   }>({ fullName: "", email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/admins", { cache: "no-store" });
@@ -35,14 +37,18 @@ export default function AdminsPage() {
         );
       }
       setItems(list);
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : "Failed to load admin accounts";
+      push({ message: msg, variant: "error" });
     } finally {
       setLoading(false);
     }
-  }
+  }, [push, q]);
   useEffect(() => {
     void load();
     // load depends on q; re-run when q changes for live filtering
-  }, [q]);
+  }, [load]);
   // Guard: only admins allowed
   useEffect(() => {
     void fetch("/api/auth/me", { cache: "no-store" })
@@ -71,22 +77,47 @@ export default function AdminsPage() {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setError(j.error || "Operation failed");
+        const message = j.error || "Operation failed";
+        setError(message);
+        push({ message, variant: "error" });
         return;
       }
       setForm({ fullName: "", email: "", password: "" });
       await load();
-    } catch {
-      setError("Network error");
+      push({
+        message: editing ? "Admin updated" : "Admin created",
+        variant: "success",
+      });
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Network error while saving";
+      setError(message);
+      push({ message, variant: "error" });
     }
   }
 
   async function remove(id: string) {
     if (!confirm("Delete this admin?")) return;
-    await fetch(`/api/admin/admins?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
-    await load();
+    try {
+      const res = await fetch(
+        `/api/admin/admins?id=${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        const message = j.error || "Failed to delete admin";
+        push({ message, variant: "error" });
+        return;
+      }
+      await load();
+      push({ message: "Admin deleted", variant: "success" });
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Network error while deleting";
+      push({ message, variant: "error" });
+    }
   }
 
   function edit(a: Admin) {

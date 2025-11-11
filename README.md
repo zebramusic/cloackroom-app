@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-1. 
-## Getting Started
+## Cloackroom App
 
-First, run the development server:
+Next.js 15 + App Router + TypeScript (strict) + Tailwind CSS v4.
+
+### Scripts
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev      # Start development (Turbopack)
+npm run build    # Production build
+npm run start    # Run production server
+npm run lint     # ESLint (flat config)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `app/` – Route segments & server/client components
+- `public/` – Static assets
+- `lib/` – Shared helpers (DB, auth, content, etc.)
+- No traditional `tailwind.config.js`; uses Tailwind v4 inline theme in `globals.css`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Products Page Content Editing
 
-## Learn More
+Marketing copy for the Products page is editable without code changes:
 
-To learn more about Next.js, take a look at the following resources:
+1. Visit `/dashboard` (admin only).
+2. Modify Hero (title, subtitle, intro) and upload a hero banner image.
+3. Adjust headings: Featured, Why, Testimonials, FAQ, Values.
+4. Edit the Values paragraph.
+5. Save changes – live immediately on `/products`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### Hero Image Upload
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Endpoint: `POST /api/content/products/hero-upload` (multipart/form-data `file` field).
+- Accepted types: PNG, JPG/JPEG, WEBP.
+- Max size: 2MB.
+- Stored at: `public/uploads/products-hero.(ext)`; previous file is replaced.
+- Resulting URL saved into page content and rendered on `/products`.
 
-## Deploy on Vercel
+### Content Persistence
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- MongoDB collection: `pageContent`, document `_id: "products"`.
+- If DB is unavailable (`getDb()` returns null), defaults are used and edits are ephemeral.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Adding More Editable Sections
+
+Extend `ProductsPageContent` in `lib/productsContent.ts`, update defaults, then expose new fields in:
+
+- API route: `app/api/content/products/route.ts` (PATCH accepts new keys).
+- Dashboard form: `app/dashboard/page.tsx`.
+- Products page: `app/products/page.tsx`.
+
+### Development Notes
+
+- Server Components by default; add `"use client"` only when needed (state/effects).
+- Use `next/image` for optimized images on public pages.
+- Theme tokens via CSS variables in `globals.css` – prefer utility classes like `bg-background`.
+- Imports: use path alias `@/`.
+
+### Deployment
+
+Standard Next.js build & deploy. Ensure environment variables for MongoDB/session are configured in production. Static hero image uploads persist with filesystem storage; for multi-instance or serverless deployments, consider migrating uploads to object storage (S3, GCS) and adjusting the upload route accordingly.
+

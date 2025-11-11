@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/app/private/toast/ToastContext";
+import { useEvents } from "@/app/hooks/useEvents";
 
 type Staff = {
   id: string;
@@ -7,9 +9,11 @@ type Staff = {
   email: string;
   isAuthorized: boolean;
   createdAt: number;
+  authorizedEventId?: string;
 };
 
 export default function StaffAdminPage() {
+  const { push } = useToast();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,10 +23,27 @@ export default function StaffAdminPage() {
     email: string;
     password?: string;
     isAuthorized: boolean;
-  }>({ fullName: "", email: "", password: "", isAuthorized: false });
+    authorizedEventId?: string | null;
+  }>({
+    fullName: "",
+    email: "",
+    password: "",
+    isAuthorized: false,
+    authorizedEventId: null,
+  });
   const [error, setError] = useState<string | null>(null);
+  const { data: events, error: eventsError } = useEvents();
 
-  async function load() {
+  useEffect(() => {
+    if (!eventsError) return;
+    const message =
+      eventsError instanceof Error
+        ? eventsError.message
+        : "Failed to load active events";
+    push({ message, variant: "error" });
+  }, [eventsError, push]);
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/staff?q=${encodeURIComponent(q)}`, {
@@ -30,16 +51,20 @@ export default function StaffAdminPage() {
       });
       const json = await res.json();
       setItems((json.items || []) as Staff[]);
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Failed to load staff list";
+      push({ message, variant: "error" });
     } finally {
       setLoading(false);
     }
-  }
+  }, [push, q]);
   useEffect(() => {
     void load();
-  }, [q]);
+  }, [load]);
   // Guard: only admins allowed
   useEffect(() => {
-    void fetch("/api/auth/me", { cache: "no-store" })
+    void fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
       .then((r) => r.json())
       .then((j) => {
         if (j?.user?.type !== "admin") {
@@ -65,22 +90,50 @@ export default function StaffAdminPage() {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setError(j.error || "Operation failed");
+        const message = j.error || "Operation failed";
+        setError(message);
+        push({ message, variant: "error" });
         return;
       }
-      setForm({ fullName: "", email: "", password: "", isAuthorized: false });
+      setForm({
+        fullName: "",
+        email: "",
+        password: "",
+        isAuthorized: false,
+        authorizedEventId: null,
+      });
       await load();
-    } catch {
-      setError("Network error");
+      push({
+        message: editing ? "Staff member updated" : "Staff member created",
+        variant: "success",
+      });
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Network error while saving";
+      setError(message);
+      push({ message, variant: "error" });
     }
   }
 
   async function remove(id: string) {
     if (!confirm("Delete this staff member?")) return;
-    await fetch(`/api/staff?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
-    await load();
+    try {
+      const res = await fetch(`/api/staff?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        const message = j.error || "Failed to delete staff member";
+        push({ message, variant: "error" });
+        return;
+      }
+      await load();
+      push({ message: "Staff member deleted", variant: "success" });
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Network error while deleting";
+      push({ message, variant: "error" });
+    }
   }
 
   function edit(u: Staff) {
@@ -90,12 +143,34 @@ export default function StaffAdminPage() {
       email: u.email,
       isAuthorized: u.isAuthorized,
       password: "",
+      authorizedEventId: u.authorizedEventId || null,
     });
   }
 
   function resetForm() {
-    setForm({ fullName: "", email: "", password: "", isAuthorized: false });
+    setForm({
+      fullName: "",
+      email: "",
+      password: "",
+      isAuthorized: false,
+      authorizedEventId: null,
+    });
   }
+
+  const activeEvents = useMemo(() => {
+    const now = Date.now();
+    return events.filter((ev) => now >= ev.startsAt && now <= ev.endsAt);
+  }, [events]);
+
+  const activeEventIds = useMemo(() => {
+    return new Set(activeEvents.map((ev) => ev.id));
+  }, [activeEvents]);
+
+  const eventNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ev of events) map.set(ev.id, ev.name);
+    return map;
+  }, [events]);
 
   const filtered = useMemo(() => items, [items]);
 
@@ -143,6 +218,21 @@ export default function StaffAdminPage() {
                     <div className="font-medium">{u.fullName}</div>
                     <div className="text-xs text-muted-foreground">
                       {u.email} • {new Date(u.createdAt).toLocaleString()}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {u.isAuthorized
+                        ? u.authorizedEventId
+                          ? `Authorized for ${
+                              eventNameById.get(u.authorizedEventId) ??
+                              u.authorizedEventId
+                            }`
+                          : "Authorized - no event assigned"
+                        : u.authorizedEventId
+                        ? `Pending access for ${
+                            eventNameById.get(u.authorizedEventId) ??
+                            u.authorizedEventId
+                          }`
+                        : "Not authorized for any event"}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -229,6 +319,41 @@ export default function StaffAdminPage() {
               <label htmlFor="auth" className="text-sm">
                 Authorized
               </label>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Active Event</label>
+              <select
+                value={form.authorizedEventId || ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    authorizedEventId: e.target.value || null,
+                  }))
+                }
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
+              >
+                <option value="">— None (no access) —</option>
+                {form.authorizedEventId &&
+                !activeEventIds.has(form.authorizedEventId) ? (
+                  <option
+                    key="selected-inactive"
+                    value={form.authorizedEventId}
+                  >
+                    {eventNameById.get(form.authorizedEventId) ??
+                      form.authorizedEventId}{" "}
+                    (inactive)
+                  </option>
+                ) : null}
+                {activeEvents.map((ev) => (
+                  <option key={ev.id} value={ev.id}>
+                    {ev.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Staff will only be able to issue/search handovers for the
+                selected event.
+              </p>
             </div>
             {error ? <div className="text-sm text-red-600">{error}</div> : null}
             <div className="flex items-center gap-2">

@@ -16,7 +16,7 @@ export default function MobileNav() {
   } | null>(null);
 
   useEffect(() => {
-    void fetch("/api/auth/me", { cache: "no-store" })
+    void fetch("/api/auth/me", { cache: "no-store", credentials: "include" })
       .then((r) => r.json())
       .then((j) => setMe(j.user || null))
       .catch(() => setMe(null));

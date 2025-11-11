@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -11,7 +10,6 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [remember, setRemember] = useState(true);
-  const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,6 +20,7 @@ export default function AdminLoginPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password, remember, type }),
+        credentials: "include",
       });
       const payload = await res
         .json()
@@ -32,9 +31,12 @@ export default function AdminLoginPage() {
       }
       // Mitigate race where navigation to /private happens before the browser
       // persists Set-Cookie from the fetch response (esp. on some mobile browsers)
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, 120));
       // Verify session actually readable (cookie present)
-      const me = await fetch("/api/auth/me", { cache: "no-store" })
+      const me = await fetch("/api/auth/me", {
+        cache: "no-store",
+        credentials: "include",
+      })
         .then((r) => r.json())
         .catch(() => null);
       if (!me?.user) {
@@ -43,7 +45,8 @@ export default function AdminLoginPage() {
       }
       const dest =
         me.user.type === "admin" ? "/private/admin" : "/private/handover";
-      router.replace(dest);
+      // Use full page navigation so Edge middleware gets the fresh cookies reliably
+      window.location.replace(dest);
     } finally {
       setLoading(false);
     }

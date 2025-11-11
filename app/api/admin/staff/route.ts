@@ -36,10 +36,12 @@ export async function POST(req: NextRequest) {
     email: String(body.email).toLowerCase(),
     passwordHash: await hashPassword(body.password),
     isAuthorized: true,
+    authorizedEventId: undefined,
     createdAt: Date.now(),
   };
   await db.collection<StaffUser>("staff").updateOne({ id: user.id }, { $set: user }, { upsert: true });
   const { passwordHash, ...safe } = user;
+  void passwordHash;
   return NextResponse.json(safe, { status: 201 });
 }
 
@@ -48,7 +50,7 @@ export async function PATCH(req: NextRequest) {
   const me = await getSessionUser(token);
   if (!me || me.type !== "admin")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const body = (await req.json()) as Partial<StaffUser> & { id?: string; password?: string; isAuthorized?: boolean };
+  const body = (await req.json()) as Partial<StaffUser> & { id?: string; password?: string; isAuthorized?: boolean; authorizedEventId?: string | null };
   if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const db = await getDb();
   if (!db) return NextResponse.json({ error: "DB not configured" }, { status: 500 });
@@ -57,10 +59,12 @@ export async function PATCH(req: NextRequest) {
   if (body.email) update.email = body.email.toLowerCase();
   if (body.password) update.passwordHash = await hashPassword(body.password);
   if (typeof body.isAuthorized === "boolean") update.isAuthorized = body.isAuthorized;
+  if (typeof body.authorizedEventId === "string") update.authorizedEventId = body.authorizedEventId || undefined;
   await db.collection<StaffUser>("staff").updateOne({ id: body.id }, { $set: update });
   const updated = await db.collection<StaffUser>("staff").findOne({ id: body.id });
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { passwordHash: _ph, ...safeUpdated } = updated;
+  const { passwordHash, ...safeUpdated } = updated;
+  void passwordHash;
   return NextResponse.json(safeUpdated);
 }
 

@@ -15,5 +15,10 @@ export async function GET() {
     .sort({ createdAt: -1 })
     .limit(50)
     .toArray();
-  return NextResponse.json({ items: admins.map(({ passwordHash: _pw, ...r }) => r) });
+  const sanitized = admins.map((admin) => {
+    const { passwordHash, ...rest } = admin;
+    void passwordHash;
+    return rest;
+  });
+  return NextResponse.json({ items: sanitized });
 }

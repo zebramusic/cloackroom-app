@@ -3,6 +3,21 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
 
+const PAGE_WIDTH_SCALE = 0.95; // 95% of A4 width
+const PAGE_HEIGHT_SCALE = 0.75; // 75% of A4 height
+const A4_WIDTH_PX = 718; // A4 width minus 10mm margins at ~96 DPI
+const A4_HEIGHT_PX = 1048; // A4 height minus 10mm margins at ~96 DPI
+const SAFE_PAGE_WIDTH_PX = Math.round(A4_WIDTH_PX * PAGE_WIDTH_SCALE);
+const SAFE_PAGE_HEIGHT_PX = Math.round(A4_HEIGHT_PX * PAGE_HEIGHT_SCALE);
+const A4_WIDTH_MM = 210;
+const A4_HEIGHT_MM = 297;
+const PDF_PAGE_WIDTH_MM = A4_WIDTH_MM * PAGE_WIDTH_SCALE;
+const PDF_PAGE_HEIGHT_MM = A4_HEIGHT_MM * PAGE_HEIGHT_SCALE;
+const SCALE_EPSILON = 0.002;
+const SCALE_BUFFER = 0.97; // reduce size slightly to guarantee single-page fit
+
+type JsPDFConstructor = typeof import("jspdf").jsPDF;
+
 type Props = { id: string };
 
 export default function PrintClient({ id }: Props) {
@@ -13,7 +28,8 @@ export default function PrintClient({ id }: Props) {
   const [shouldAutoPrint, setShouldAutoPrint] = useState(false);
   const [forceLandscape, setForceLandscape] = useState(false);
   const [maxDim, setMaxDim] = useState(1600);
-  const [lang, setLang] = useState<"ro" | "en">("ro");
+  const [lang, setLang] = useState<"ro" | "en" | "both">("ro");
+  const [contentScale, setContentScale] = useState(1);
   const userChangedLang = useRef(false);
 
   useEffect(() => {
@@ -62,76 +78,133 @@ export default function PrintClient({ id }: Props) {
     [data, optimizedPhotos, lang]
   );
 
-  type Html2Pdf = {
-    from: (el: Element) => Html2Pdf;
-    set: (opts: Record<string, unknown>) => Html2Pdf;
-    save: () => Promise<void> | void;
-    toPdf?: () => Html2Pdf;
-    get?: (key: "pdf") => unknown;
-  };
-  type Html2PdfFactory = (() => Html2Pdf) & {
-    from: (el: Element) => Html2Pdf;
-    set: (opts: Record<string, unknown>) => Html2Pdf;
-  };
-  type JsPDF = { output: (type: "blob" | string) => Blob | string };
-  function isJsPDF(x: unknown): x is JsPDF {
-    return !!x && typeof (x as { output?: unknown }).output === "function";
-  }
-
-  const downloadPdf = useCallback(async () => {
-    try {
-      const mod: unknown = await import("html2pdf.js");
-      const possible = mod as Html2PdfFactory | { default?: unknown };
-      let factory: Html2PdfFactory | undefined;
-      if (typeof (possible as { default?: unknown }).default === "function") {
-        factory = (possible as { default: Html2PdfFactory }).default;
-      } else if (typeof possible === "function") {
-        factory = possible as Html2PdfFactory;
-      }
-      const el = contentRef.current;
-      if (!el || !data) return;
-      el.classList.add("pdf-mode");
-      if (!factory) {
-        window.print();
-        return;
-      }
-      const worker = factory()
-        .from(el)
-        .set({
-          margin: 10,
-          filename: `handover_${data.id}.pdf`,
-          image: { type: "jpeg", quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        });
-      if (
-        typeof worker.toPdf === "function" &&
-        typeof worker.get === "function"
-      ) {
-        try {
-          const w2 = worker.toPdf() as Html2Pdf;
-          const pdfUnknown = (w2.get as (k: "pdf") => unknown)("pdf");
-          const pdf = isJsPDF(pdfUnknown) ? pdfUnknown : null;
-          if (pdf) {
-            const blob = pdf.output("blob") as Blob;
-            const url = URL.createObjectURL(blob);
-            window.open(url, "_blank", "noopener,noreferrer");
-          } else {
-            await (worker as Html2Pdf).save?.();
-          }
-        } catch {
-          await (worker as Html2Pdf).save?.();
-        }
-      } else {
-        await (worker as Html2Pdf).save?.();
-      }
-    } catch (e) {
-      console.error(e);
-      window.print();
-    } finally {
-      contentRef.current?.classList.remove("pdf-mode");
+  const recalcScale = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const width = el.scrollWidth;
+    const height = el.scrollHeight;
+    if (!width || !height) {
+      setContentScale(1);
+      return;
     }
-  }, [data, isJsPDF]);
+    const widthScale = SAFE_PAGE_WIDTH_PX / width;
+    const heightScale = SAFE_PAGE_HEIGHT_PX / height;
+    const raw = Math.min(1, widthScale, heightScale);
+    const buffered = Math.min(raw * SCALE_BUFFER, 1);
+    const next = buffered;
+    setContentScale((prev) =>
+      Math.abs(prev - next) > SCALE_EPSILON ? next : prev
+    );
+  }, []);
+
+  const ensureScaleApplied = useCallback(async () => {
+    recalcScale();
+    if (typeof window === "undefined") return;
+    await new Promise<void>((resolve) => {
+      if (typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(() => resolve());
+      } else {
+        window.setTimeout(() => resolve(), 16);
+      }
+    });
+  }, [recalcScale]);
+
+  useEffect(() => {
+    recalcScale();
+  }, [html, recalcScale]);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      recalcScale();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [recalcScale]);
+
+  const downloadPdf = useCallback(
+    async (mode: "save" | "open" = "save") => {
+      try {
+        await ensureScaleApplied();
+        const el = contentRef.current;
+        if (!el || !data) return;
+        el.classList.add("pdf-mode");
+
+        const [html2canvasMod, jspdfMod] = await Promise.all([
+          import("html2canvas"),
+          import("jspdf"),
+        ]);
+
+        const html2canvasFn = ((html2canvasMod as { default?: unknown })
+          .default || html2canvasMod) as unknown as (
+          element: HTMLElement,
+          options?: Record<string, unknown>
+        ) => Promise<HTMLCanvasElement>;
+        if (typeof html2canvasFn !== "function") {
+          window.print();
+          return;
+        }
+
+        const JsPDFCtor =
+          (jspdfMod as { jsPDF?: JsPDFConstructor; default?: JsPDFConstructor })
+            .jsPDF ||
+          (jspdfMod as { jsPDF?: JsPDFConstructor; default?: JsPDFConstructor })
+            .default;
+        if (!JsPDFCtor) {
+          window.print();
+          return;
+        }
+
+        const canvas = await html2canvasFn(el, {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+          windowWidth: SAFE_PAGE_WIDTH_PX,
+          windowHeight: SAFE_PAGE_HEIGHT_PX,
+          scrollX: 0,
+          scrollY: 0,
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const pdf = new JsPDFCtor({
+          orientation: "portrait",
+          unit: "mm",
+          format: [PDF_PAGE_WIDTH_MM, PDF_PAGE_HEIGHT_MM],
+        });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        let imgWidth = pageWidth;
+        let imgHeight = (canvas.height * imgWidth) / canvas.width;
+        if (imgHeight > pageHeight) {
+          imgHeight = pageHeight;
+          imgWidth = (canvas.width * imgHeight) / canvas.height;
+        }
+        const offsetX = (pageWidth - imgWidth) / 2;
+        const offsetY = (pageHeight - imgHeight) / 2;
+        pdf.addImage(imgData, "JPEG", offsetX, offsetY, imgWidth, imgHeight);
+
+        if (mode === "open") {
+          const blob = pdf.output("blob");
+          const url = typeof blob !== "string" ? URL.createObjectURL(blob) : "";
+          if (url) {
+            window.open(url, "_blank", "noopener,noreferrer");
+            setTimeout(() => URL.revokeObjectURL(url), 30_000);
+          } else {
+            pdf.save(`handover_${data.id}.pdf`);
+          }
+        } else {
+          pdf.save(`handover_${data.id}.pdf`);
+        }
+      } catch (e) {
+        console.error(e);
+        window.print();
+      } finally {
+        contentRef.current?.classList.remove("pdf-mode");
+      }
+    },
+    [data, ensureScaleApplied]
+  );
 
   useEffect(() => {
     const usp = new URLSearchParams(window.location.search);
@@ -145,7 +218,7 @@ export default function PrintClient({ id }: Props) {
     if (quality === "high") setMaxDim(2400);
     else if (quality === "low") setMaxDim(1000);
     const lp = usp.get("lang");
-    if (lp === "en" || lp === "ro") setLang(lp);
+    if (lp === "en" || lp === "ro" || lp === "both") setLang(lp as typeof lang);
   }, []);
 
   useEffect(() => {
@@ -159,11 +232,13 @@ export default function PrintClient({ id }: Props) {
   useEffect(() => {
     if (!data || !shouldAutoPrint) return;
     const t = setTimeout(() => {
-      if (shouldOpenPdf) void downloadPdf();
-      else window.print();
+      if (shouldOpenPdf) void downloadPdf("open");
+      else {
+        void ensureScaleApplied().then(() => window.print());
+      }
     }, 200);
     return () => clearTimeout(t);
-  }, [data, shouldAutoPrint, shouldOpenPdf, downloadPdf]);
+  }, [data, shouldAutoPrint, shouldOpenPdf, downloadPdf, ensureScaleApplied]);
 
   if (!data)
     return (
@@ -182,7 +257,7 @@ export default function PrintClient({ id }: Props) {
       <div className="flex items-center justify-between gap-4 print:hidden mb-4 z-10">
         <Link
           href="/private/handovers"
-          className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="text-sm rounded-full border border-border bg-card text-foreground px-3 py-1 hover:bg-muted z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           aria-label="Back to Handover"
         >
           ← Back to Handover
@@ -206,10 +281,10 @@ export default function PrintClient({ id }: Props) {
                   `${window.location.pathname}?${usp.toString()}`
                 );
               }}
-              className={`text-xs rounded-full border px-2 py-1 ${
+              className={`text-xs rounded-full border px-2 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                 lang === "ro"
                   ? "bg-accent text-accent-foreground border-accent"
-                  : "border-border hover:bg-muted"
+                  : "bg-card text-foreground border-border hover:bg-muted"
               }`}
             >
               RO
@@ -228,43 +303,89 @@ export default function PrintClient({ id }: Props) {
                   `${window.location.pathname}?${usp.toString()}`
                 );
               }}
-              className={`text-xs rounded-full border px-2 py-1 ${
+              className={`text-xs rounded-full border px-2 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                 lang === "en"
                   ? "bg-accent text-accent-foreground border-accent"
-                  : "border-border hover:bg-muted"
+                  : "bg-card text-foreground border-border hover:bg-muted"
               }`}
             >
               EN
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (lang === "both") return;
+                userChangedLang.current = true;
+                setLang("both");
+                const usp = new URLSearchParams(window.location.search);
+                usp.set("lang", "both");
+                window.history.replaceState(
+                  null,
+                  "",
+                  `${window.location.pathname}?${usp.toString()}`
+                );
+              }}
+              className={`text-xs rounded-full border px-2 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                lang === "both"
+                  ? "bg-accent text-accent-foreground border-accent"
+                  : "bg-card text-foreground border-border hover:bg-muted"
+              }`}
+            >
+              RO+EN
+            </button>
           </div>
           <button
-            onClick={() => window.print()}
-            className="text-sm rounded-full border border-border px-3 py-1 hover:bg-muted"
+            onClick={() => {
+              void ensureScaleApplied().then(() => window.print());
+            }}
+            className="text-sm rounded-full border border-border bg-card text-foreground px-3 py-1 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             type="button"
           >
             Print
           </button>
           <button
             onClick={() => void downloadPdf()}
-            className="text-sm rounded-full bg-accent text-accent-foreground px-3 py-1 hover:opacity-95"
+            className="text-sm rounded-full bg-accent text-accent-foreground px-3 py-1 hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             type="button"
           >
             Download PDF
           </button>
         </div>
       </div>
-      <div
-        ref={contentRef}
-        className="print-light"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <div className="w-full overflow-x-auto">
+        <div
+          className="print-sheet"
+          style={{
+            width: `${SAFE_PAGE_WIDTH_PX}px`,
+            height: `${SAFE_PAGE_HEIGHT_PX}px`,
+            minHeight: `${SAFE_PAGE_HEIGHT_PX}px`,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            ref={contentRef}
+            className={`print-light${contentScale < 1 ? " auto-scale" : ""}`}
+            style={{
+              width: `${SAFE_PAGE_WIDTH_PX}px`,
+              transform:
+                contentScale < 1 ? `scale(${contentScale})` : undefined,
+              transformOrigin: "top left",
+            }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </div>
+      </div>
     </main>
   );
 }
 
 const styles = `
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: ${PDF_PAGE_WIDTH_MM.toFixed(2)}mm ${PDF_PAGE_HEIGHT_MM.toFixed(
+  2
+)}mm; margin: 10mm; }
   body, .print-light { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#fff; color:#111; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size:13px; }
+  .print-sheet{ width:${SAFE_PAGE_WIDTH_PX}px; min-height:${SAFE_PAGE_HEIGHT_PX}px; height:${SAFE_PAGE_HEIGHT_PX}px; max-height:${SAFE_PAGE_HEIGHT_PX}px; margin:0 auto; position:relative; overflow:hidden; background:#fff; }
+  .print-sheet .print-light{ width:${SAFE_PAGE_WIDTH_PX}px; }
   .print-light { line-height:1.45; }
   /* Single-page enforced grid layout */
   .single-page-grid{ display:grid; grid-template-columns:1fr; gap:12px; align-items:start; }
@@ -505,13 +626,14 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 function buildHTML(
   r: HandoverReport,
   photosOverride?: string[],
-  lang: "ro" | "en" = "ro"
+  lang: "ro" | "en" | "both" = "ro"
 ) {
   const descriere = r.notes?.trim()
     ? esc(r.notes.trim())
     : "[Marca, modelul, seria, culoarea, starea etc.]";
-  const staffText = (r.staff && r.staff.trim()) || "(staff member)";
 
+  const staffName =
+    r.staff && r.staff.trim() ? esc(r.staff.trim()) : "(personal)";
   const bodyRO = `
     <h2 style="margin:0 0 6px;font-size:13px">Declarație pe propria răspundere</h2>
     <p>Subsemnatul(a) <strong>${esc(
@@ -522,7 +644,7 @@ function buildHTML(
     r.clothType ? `<strong>Tip articol:</strong> ${esc(r.clothType)}, ` : ""
   }<strong>${descriere}</strong>, fără prezentarea tichetului primit la predare, întrucât declar că l-am pierdut.</p>
     <p>Sunt de acord cu fotografierea actului meu de identitate, a mea și a bunului revendicat pe propria răspundere și sunt de acord cu prelucrarea și păstrarea datelor mele personale pe o perioadă de 3 ani de la data de azi.</p>
-    <p>Predarea se face strict pe răspunderea mea și în baza declarațiilor mele. Aceasta este declarația pe care o dau, o semnez și o susțin în fața lui <strong>Gabriel Ursache</strong>, reprezentant al Zebra Music Production s.r.l..</p>
+    <p>Predarea se face strict pe răspunderea mea și în baza declarațiilor mele. Aceasta este declarația pe care o dau, o semnez și o susțin în fața <strong>${staffName}</strong>, reprezentant al Zebra Music Production s.r.l..</p>
   `;
 
   const bodyEN = `
@@ -535,7 +657,7 @@ function buildHTML(
     r.clothType ? `<strong>Item type:</strong> ${esc(r.clothType)}, ` : ""
   }<strong>${descriere}</strong>, without presenting the ticket received at deposit, as I declare I have lost it.</p>
     <p>I agree to the photographing of my identity document, myself, and the claimed item on my own responsibility, and I agree to the processing and storage of my personal data for a period of 3 years from today.</p>
-    <p>The handover is made strictly under my responsibility and based on my statements. This is the statement that I make, sign, and uphold in the presence of <strong>Gabriel Ursache</strong>, representative of Zebra Music Production S.R.L.</p>
+    <p>The handover is made strictly under my responsibility and based on my statements. This is the statement that I make, sign, and uphold in the presence of <strong>${staffName}</strong>, representative of Zebra Music Production S.R.L.</p>
   `;
 
   const imgs = photosOverride ?? r.photos ?? [];
@@ -567,9 +689,18 @@ function buildHTML(
     phoneField += "</span></span>";
   }
 
-  const declarationBlock = lang === "ro" ? bodyRO : bodyEN;
+  const declarationBlock =
+    lang === "ro"
+      ? bodyRO
+      : lang === "en"
+      ? bodyEN
+      : `<div class="bilingual">${bodyRO}<div style="height:8px"></div><hr style="border:none;border-top:1px dashed #ddd;margin:6px 0" /><div style="height:8px"></div>${bodyEN}</div>`;
   const title =
-    lang === "ro" ? "Proces-verbal de predare-primire" : "Handover Statement";
+    lang === "both"
+      ? "Proces-verbal de predare-primire / Handover Statement"
+      : lang === "ro"
+      ? "Proces-verbal de predare-primire"
+      : "Handover Statement";
 
   return `
     <div class="single-page-grid">

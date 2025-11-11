@@ -1,17 +1,122 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import DbStatusDot from "@/app/components/DbStatusDot";
+import type { Locale } from "@/app/i18n/translations";
 
 type Me = { id: string; fullName: string; type?: "staff" | "admin" } | null;
 
+const NAV_COPY: Record<
+  Locale,
+  {
+    publicPage: string;
+    home: string;
+    handover: string;
+    reports: string;
+    admin: string;
+    openMenu: string;
+    closeMenu: string;
+    menuTitle: string;
+    navigationMenu: string;
+    logout: string;
+    login: string;
+    signedInAs: string;
+    adminRole: string;
+    staffRole: string;
+  }
+> = {
+  en: {
+    publicPage: "Public page",
+    home: "Home",
+    handover: "Handover",
+    reports: "Reports",
+    admin: "Admin",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
+    menuTitle: "Menu",
+    navigationMenu: "Navigation menu",
+    logout: "Logout",
+    login: "Login",
+    signedInAs: "Signed in as",
+    adminRole: "Admin",
+    staffRole: "Staff",
+  },
+  ro: {
+    publicPage: "Pagina publica",
+    home: "Acasa",
+    handover: "Predare",
+    reports: "Rapoarte",
+    admin: "Admin",
+    openMenu: "Deschide meniul",
+    closeMenu: "Inchide meniul",
+    menuTitle: "Meniu",
+    navigationMenu: "Meniu navigare",
+    logout: "Deconectare",
+    login: "Autentificare",
+    signedInAs: "Conectat ca",
+    adminRole: "Admin",
+    staffRole: "Personal",
+  },
+};
+
+function readCookieLocale(): Locale | undefined {
+  if (typeof document === "undefined") return undefined;
+  const cookies = document.cookie.split("; ");
+  for (const entry of cookies) {
+    if (!entry) continue;
+    const [name, ...rest] = entry.split("=");
+    if (name !== "lang") continue;
+    const value = rest.join("=").toLowerCase();
+    if (value === "en" || value === "ro") return value;
+  }
+  return undefined;
+}
+
+function persistCookieLocale(locale: Locale) {
+  if (typeof document === "undefined") return;
+  const oneYear = 60 * 60 * 24 * 365;
+  document.cookie = `lang=${locale}; path=/; max-age=${oneYear}`;
+}
+
 export default function PrivateNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const langParam = searchParams.get("lang");
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
+  const [locale, setLocale] = useState<Locale>("en");
+  const [loginUnlocked, setLoginUnlocked] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   // removed unused firstFocusable ref
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const admProgress = useRef(0);
+
+  useEffect(() => {
+    const requested = langParam;
+    const normalized =
+      requested === "ro" ? "ro" : requested === "en" ? "en" : undefined;
+    if (normalized) {
+      setLocale(normalized);
+      persistCookieLocale(normalized);
+      return;
+    }
+    const cookieLocale = readCookieLocale();
+    if (cookieLocale) {
+      setLocale(cookieLocale);
+      return;
+    }
+    if (typeof navigator !== "undefined" && navigator.language) {
+      const navLang = navigator.language.toLowerCase();
+      if (navLang.startsWith("ro")) {
+        setLocale("ro");
+        persistCookieLocale("ro");
+        return;
+      }
+    }
+    setLocale("en");
+    persistCookieLocale("en");
+  }, [langParam]);
 
   useEffect(() => {
     void fetch("/api/auth/me", { cache: "no-store" })
@@ -19,6 +124,33 @@ export default function PrivateNav() {
       .then((j) => setMe(j.user || null))
       .catch(() => setMe(null));
   }, []);
+
+  useEffect(() => {
+    if (me) {
+      setLoginUnlocked(false);
+      admProgress.current = 0;
+      return;
+    }
+    if (loginUnlocked) return;
+    function onKey(e: KeyboardEvent) {
+      const key = e.key.toLowerCase();
+      const sequence = ["a", "d", "m"];
+      if (key === sequence[admProgress.current]) {
+        admProgress.current += 1;
+        if (admProgress.current === sequence.length) {
+          setLoginUnlocked(true);
+          admProgress.current = 0;
+        }
+        return;
+      }
+      admProgress.current = key === sequence[0] ? 1 : 0;
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      admProgress.current = 0;
+    };
+  }, [me, loginUnlocked]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -69,11 +201,13 @@ export default function PrivateNav() {
     location.href = "/private/admin/login";
   }
 
+  const copy = NAV_COPY[locale];
+
   const linkClasses = (active: boolean) =>
-    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+    `inline-flex h-9 items-center rounded-full border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
       active
-        ? "bg-accent text-accent-foreground"
-        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        ? "border-transparent bg-accent text-accent-foreground shadow-sm"
+        : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
   const [reportCount, setReportCount] = useState<number | null>(null);
@@ -85,15 +219,14 @@ export default function PrivateNav() {
   }, []);
 
   const links = [
-    { href: "/private", label: "Home", active: pathname === "/private" },
     {
       href: "/private/handover",
-      label: "Handover",
+      label: copy.handover,
       active: pathname.startsWith("/private/handover"),
     },
     {
       href: "/private/handovers",
-      label: `Reports${
+      label: `${copy.reports}${
         typeof reportCount === "number" ? ` (${reportCount})` : ""
       }`,
       active: pathname.startsWith("/private/handovers"),
@@ -101,7 +234,7 @@ export default function PrivateNav() {
     me?.type === "admin"
       ? {
           href: "/private/admin",
-          label: "Admin",
+          label: copy.admin,
           active: pathname.startsWith("/private/admin"),
         }
       : null,
@@ -109,13 +242,16 @@ export default function PrivateNav() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+      <header
+        suppressHydrationWarning
+        className="sticky top-12 z-50 border-b border-border bg-background/90 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/70"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               onClick={toggle}
-              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-muted"
-              aria-label={open ? "Close menu" : "Open menu"}
+              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-transparent text-foreground transition-colors hover:bg-muted"
+              aria-label={open ? copy.closeMenu : copy.openMenu}
               aria-expanded={open}
               aria-controls="mobile-nav-panel"
               type="button"
@@ -142,7 +278,7 @@ export default function PrivateNav() {
               href="/private"
               className="text-sm font-semibold tracking-wide text-foreground"
             >
-              Cloackroom
+              Handovers section
             </Link>
             <nav className="hidden md:flex items-center gap-1">
               {links.map((l) => (
@@ -159,31 +295,37 @@ export default function PrivateNav() {
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            {/* DB connection witness */}
+            <DbStatusDot />
             {me ? (
               <>
-                <span className="hidden sm:inline text-sm text-muted-foreground max-w-[140px] truncate">
-                  {me.fullName}
+                <div className="hidden sm:flex items-center gap-2 max-w-[240px]">
+                  <span className="text-sm text-muted-foreground truncate">
+                    {me.fullName}
+                  </span>
                   {me.type ? (
-                    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide">
-                      {me.type}
+                    <span
+                      className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground"
+                    >
+                      {me.type === "admin" ? copy.adminRole : copy.staffRole}
                     </span>
                   ) : null}
-                </span>
+                </div>
                 <button
                   onClick={() => void logout()}
-                  className="text-xs rounded-full border border-border px-3 py-1 hover:bg-muted"
+                  className="text-xs rounded-full border border-border bg-transparent px-3 py-1 text-foreground transition-colors hover:bg-muted"
                 >
-                  Logout
+                  {copy.logout}
                 </button>
               </>
-            ) : (
+            ) : loginUnlocked ? (
               <Link
                 href="/private/admin/login"
-                className="text-xs rounded-full border border-border px-3 py-1 hover:bg-muted"
+                className="text-xs rounded-full border border-border bg-transparent px-3 py-1 text-foreground transition-colors hover:bg-muted"
               >
-                Login
+                {copy.login}
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
@@ -192,10 +334,10 @@ export default function PrivateNav() {
           {/** Body scroll lock (imperative) */}
           <BodyScrollLock />
           <div
-            className="md:hidden fixed inset-0 z-[100]"
+            className="md:hidden fixed inset-x-0 top-12 bottom-0 z-[100]"
             role="dialog"
             aria-modal="true"
-            aria-label="Navigation menu"
+            aria-label={copy.navigationMenu}
           >
             <div
               className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -207,17 +349,19 @@ export default function PrivateNav() {
               className="absolute inset-y-0 left-0 w-72 max-w-[80%] bg-background border-r border-border shadow-xl flex flex-col animate-slide-in"
             >
               <div className="h-14 flex items-center justify-between px-4 border-b border-border">
-                <span className="text-sm font-semibold">Menu</span>
+                <span className="text-sm font-semibold">{copy.menuTitle}</span>
                 <button
                   onClick={close}
-                  aria-label="Close menu"
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted"
+                  aria-label={copy.closeMenu}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-transparent text-foreground transition-colors hover:bg-muted"
                   type="button"
                 >
                   ✕
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
+              <div
+                className="flex-1 overflow-y-auto bg-background p-3 text-foreground flex flex-col gap-1"
+              >
                 {links.map((l) => (
                   <Link
                     key={l.href}
@@ -233,24 +377,24 @@ export default function PrivateNav() {
                   {me ? (
                     <button
                       onClick={() => void logout()}
-                      className="w-full text-left px-3 py-2 rounded-md text-sm border border-border hover:bg-muted"
+                      className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
                       type="button"
                     >
-                      Logout
+                      {copy.logout}
                     </button>
-                  ) : (
+                  ) : loginUnlocked ? (
                     <Link
                       href="/private/admin/login"
-                      className="block px-3 py-2 rounded-md text-sm border border-border hover:bg-muted"
+                      className="block rounded-md border border-border bg-transparent px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                       onClick={close}
                     >
-                      Login
+                      {copy.login}
                     </Link>
-                  )}
+                  ) : null}
                 </div>
                 {me ? (
                   <div className="mt-auto text-[11px] text-muted-foreground px-2 py-3">
-                    Signed in as{" "}
+                    {copy.signedInAs}{" "}
                     <span className="font-medium">{me.fullName}</span>
                   </div>
                 ) : null}

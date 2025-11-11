@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import type { Event } from "@/app/models/event";
 import { isEventActive } from "@/app/models/event";
+import { useToast } from "@/app/private/toast/ToastContext";
+import { useEvents } from "@/app/hooks/useEvents";
 
 interface DraftEvent {
   name: string;
@@ -10,13 +12,14 @@ interface DraftEvent {
 }
 
 export default function AdminEventsPage() {
-  const [items, setItems] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { push } = useToast();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftEvent>(() => presetDraft());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<DraftEvent | null>(null);
+  const { data: items, error: eventsError, isLoading, mutate } = useEvents();
+  const loading = isLoading && items.length === 0;
 
   function presetDraft(): DraftEvent {
     const now = new Date();
@@ -50,26 +53,14 @@ export default function AdminEventsPage() {
     return date.getTime();
   }
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/events", { cache: "no-store" });
-      const json = (await res.json()) as { items?: Event[] };
-      const arr = Array.isArray(json.items) ? [...json.items] : [];
-      arr.sort((a, b) => a.startsAt - b.startsAt);
-      setItems(arr);
-    } catch (e) {
-      console.error(e);
-      setError("Failed to load events");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    void load();
-  }, []);
+    if (!eventsError) return;
+    const message =
+      eventsError instanceof Error
+        ? eventsError.message
+        : "Failed to load events";
+    push({ message, variant: "error" });
+  }, [eventsError, push]);
 
   async function create() {
     if (!draft.name.trim()) return;
@@ -97,9 +88,12 @@ export default function AdminEventsPage() {
         throw new Error(j.error || `Create failed (${res.status})`);
       }
       setDraft(presetDraft());
-      await load();
+      await mutate();
+      push({ message: "Event created", variant: "success" });
     } catch (e) {
-      setError((e as Error).message);
+      const message = (e as Error).message;
+      setError(message);
+      push({ message, variant: "error" });
     } finally {
       setCreating(false);
     }
@@ -143,9 +137,12 @@ export default function AdminEventsPage() {
         throw new Error(j.error || `Update failed (${res.status})`);
       }
       cancelEdit();
-      await load();
+      await mutate();
+      push({ message: "Event updated", variant: "success" });
     } catch (e) {
-      setError((e as Error).message);
+      const message = (e as Error).message;
+      setError(message);
+      push({ message, variant: "error" });
     }
   }
 
@@ -159,9 +156,12 @@ export default function AdminEventsPage() {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || `Delete failed (${res.status})`);
       }
-      await load();
+      await mutate();
+      push({ message: "Event deleted", variant: "success" });
     } catch (e) {
-      setError((e as Error).message);
+      const message = (e as Error).message;
+      setError(message);
+      push({ message, variant: "error" });
     }
   }
 

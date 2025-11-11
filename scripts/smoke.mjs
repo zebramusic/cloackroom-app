@@ -43,10 +43,6 @@ async function main() {
 
   // Start prod server
   const server = spawn("npm", ["run", "start"], { stdio: "inherit" });
-  let closed = false;
-  server.on("exit", () => {
-    closed = true;
-  });
 
   // Wait for readiness (simple retry loop)
   let ready = false;

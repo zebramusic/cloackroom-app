@@ -1,23 +1,3 @@
-import Navbar from "@/app/components/Navbar";
-import Hero from "@/app/components/Hero";
-import Features from "@/app/components/Features";
-import Partners from "@/app/components/Partners";
-import FAQ from "@/app/components/FAQ";
-import Contact from "@/app/components/Contact";
-import Footer from "@/app/components/Footer";
-
-export default function Home() {
-  return (
-    <div className="font-sans">
-      <Navbar />
-      <Hero />
-
-      <Features />
-      <Partners />
-      <p>h</p>ello
-      <FAQ />
-      <Contact />
-      <Footer />
-    </div>
-  );
-}
+// Re-export the new landing page as the root ("/") so the homepage shows the hi‑tech landing.
+export { metadata } from "./landing/page";
+export { default } from "./landing/page";

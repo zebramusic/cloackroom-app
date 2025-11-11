@@ -32,6 +32,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: type === "admin" ? "Admin email not found" : "Staff email not found" }, { status: 401 });
   }
   const passwordHash = (user as CombinedUser).passwordHash;
+  // If logging in as staff, ensure the account is authorized
+  if (type === "staff" && (user as StaffUser).isAuthorized === false) {
+    return NextResponse.json({ error: "Staff account is not authorized" }, { status: 403 });
+  }
   const ok = await verifyPassword(body.password, passwordHash);
   if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   // Opportunistic upgrade of legacy hashes
