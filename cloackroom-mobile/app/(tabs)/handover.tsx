@@ -64,8 +64,9 @@ export default function HandoverScreen() {
   }, [staff, user?.fullName]);
 
   useEffect(() => {
-    if (user?.type === "admin" && !eventId && events?.length === 1) {
-      setEventId(events[0].id);
+    const onlyEventId = events?.length === 1 ? events[0]?.id : undefined;
+    if (user?.type === "admin" && !eventId && onlyEventId) {
+      setEventId(onlyEventId);
     }
   }, [eventId, events, user?.type]);
 
@@ -313,7 +314,7 @@ export default function HandoverScreen() {
         <TextInput
           placeholder="Coat number"
           placeholderTextColor="#64748b"
-                          <ExpoImage
+          style={styles.input}
           value={coatNumber}
           onChangeText={setCoatNumber}
         />
@@ -321,9 +322,9 @@ export default function HandoverScreen() {
           placeholder="Full name"
           placeholderTextColor="#64748b"
           style={styles.input}
-                            onError={() =>
-                              console.log(`Photo ${index} failed to load`)
-                            }
+          value={fullName}
+          onChangeText={setFullName}
+        />
         <TextInput
           placeholder="Phone"
           placeholderTextColor="#64748b"
@@ -418,7 +419,7 @@ export default function HandoverScreen() {
               <View key={label} style={styles.photoSlot}>
                 {source ? (
                   <>
-                    <Image
+                    <ExpoImage
                       source={{ uri: source }}
                       style={styles.photoPreview}
                       contentFit="cover"
@@ -426,8 +427,8 @@ export default function HandoverScreen() {
                       onLoad={() =>
                         console.log(`Photo ${index} loaded successfully`)
                       }
-                      onError={(error) =>
-                        console.log(`Photo ${index} failed to load:`, error)
+                      onError={() =>
+                        console.log(`Photo ${index} failed to load`)
                       }
                       placeholder={{
                         uri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
@@ -467,7 +468,7 @@ export default function HandoverScreen() {
             <View style={styles.extraGrid}>
               {photos.slice(photoPrompts.length).map((uri, index) => (
                 <View key={index} style={styles.extraItem}>
-                    <ExpoImage
+                  <ExpoImage
                     source={{ uri }}
                     style={styles.extraPreview}
                     contentFit="cover"

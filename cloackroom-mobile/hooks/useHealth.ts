@@ -3,11 +3,6 @@ import { useCallback, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import type { HealthResponse } from '@/lib/types';
 
-type HealthQueryOptions = {
-  // Reserved for future use; manual trigger required
-  enabled?: boolean;
-};
-
 type RefetchOptions = {
   throwOnError?: boolean;
 };
@@ -17,7 +12,7 @@ type RefetchResult = {
   error?: unknown;
 };
 
-export function useHealth(_options?: HealthQueryOptions) {
+export function useHealth() {
   const [data, setData] = useState<HealthResponse | undefined>(undefined);
   const [error, setError] = useState<unknown>(null);
   const [isFetching, setIsFetching] = useState(false);

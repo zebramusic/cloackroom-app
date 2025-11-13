@@ -1,10 +1,10 @@
+import { Image as ExpoImage } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   StyleSheet,
   Switch,
@@ -393,7 +393,13 @@ export default function HandoverDetailScreen() {
         <Text style={styles.label}>Photos</Text>
         <View style={styles.photoGrid}>
           {data.photos?.map((src, index) => (
-            <Image key={index} source={{ uri: src }} style={styles.photo} />
+            <ExpoImage
+              key={index}
+              source={{ uri: src }}
+              style={styles.photo}
+              contentFit="cover"
+              accessibilityLabel={`Evidence photo ${index + 1}`}
+            />
           ))}
         </View>
       </View>

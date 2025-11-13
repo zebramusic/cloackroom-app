@@ -19,7 +19,7 @@ function resolveCorsOrigin(origin: string | null): string | null {
     if (parsed.hostname.endsWith(DEV_TUNNEL_SUFFIX)) {
       return origin;
     }
-  } catch (error) {
+  } catch {
     // ignore invalid origins
   }
   return null;

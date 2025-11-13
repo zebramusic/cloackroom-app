@@ -6,7 +6,7 @@ module.exports = async () => {
   return defineConfig([
     expoConfig,
     {
-      ignores: ["dist/*"],
+      ignores: ["dist/*", ".expo/**"],
       settings: {
         "import/resolver": {
           typescript: {},

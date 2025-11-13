@@ -45,7 +45,7 @@ export async function apiFetch<T = unknown>(
   const data = text ? (() => {
     try {
       return JSON.parse(text) as T;
-    } catch (e) {
+    } catch {
       throw new ApiError(res.status, 'Invalid JSON response', text);
     }
   })() : (undefined as T | undefined);
