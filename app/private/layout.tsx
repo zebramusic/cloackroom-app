@@ -10,7 +10,9 @@ export default function PrivateRootLayout({
 }) {
   return (
     <div className="private-theme min-h-screen bg-background text-foreground">
-      <SiteNav />
+      <Suspense fallback={null}>
+        <SiteNav />
+      </Suspense>
       <Suspense fallback={null}>
         <PrivateNav />
       </Suspense>
