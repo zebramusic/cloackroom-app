@@ -349,6 +349,13 @@ export default function HandoverClient() {
   }, [selectedDeviceId, cameraOpen, startCamera]);
 
   async function submit() {
+    if (!selectedEventId) {
+      push({
+        message: "Select an active event before saving a handover.",
+        variant: "error",
+      });
+      return;
+    }
     if (!coatNumber.trim() || !fullName.trim()) return;
     if (photos.length < 4) return;
     if (phone.trim() && !phoneVerified) return;
@@ -359,7 +366,7 @@ export default function HandoverClient() {
         id,
         coatNumber: coatNumber.trim(),
         fullName: fullName.trim(),
-        eventId: selectedEventId || undefined,
+        eventId: selectedEventId!,
         eventName: selectedEventId
           ? events.find((e) => e.id === selectedEventId)?.name
           : undefined,
@@ -490,6 +497,13 @@ export default function HandoverClient() {
                 Tagged to event – will appear on print.
               </div>
             )}
+            {!selectedEventId ? (
+              <div className="text-[10px] text-red-600">
+                {activeEvents.length === 0
+                  ? "No active event available. Activate an event before creating a handover."
+                  : "Select an active event to continue."}
+              </div>
+            ) : null}
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -1215,8 +1229,10 @@ export default function HandoverClient() {
           </div>
           <div className="mt-6 flex justify-end">
             <button
-              disabled={submitting || !coatNumber || !fullName}
-              aria-disabled={photos.length < 4}
+              disabled={
+                submitting || !coatNumber || !fullName || !selectedEventId
+              }
+              aria-disabled={photos.length < 4 || !selectedEventId}
               onClick={submit}
               className="inline-flex items-center rounded-full bg-accent text-accent-foreground px-5 py-2.5 text-sm font-medium shadow hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >

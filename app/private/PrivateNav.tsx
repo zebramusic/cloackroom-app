@@ -304,9 +304,7 @@ export default function PrivateNav() {
                     {me.fullName}
                   </span>
                   {me.type ? (
-                    <span
-                      className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground"
-                    >
+                    <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground">
                       {me.type === "admin" ? copy.adminRole : copy.staffRole}
                     </span>
                   ) : null}
@@ -353,15 +351,13 @@ export default function PrivateNav() {
                 <button
                   onClick={close}
                   aria-label={copy.closeMenu}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-transparent text-foreground transition-colors hover:bg-muted"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-transparent text-foreground transition-colors hover:bg-muted"
                   type="button"
                 >
                   ✕
                 </button>
               </div>
-              <div
-                className="flex-1 overflow-y-auto bg-background p-3 text-foreground flex flex-col gap-1"
-              >
+              <div className="flex-1 overflow-y-auto bg-background p-3 text-foreground flex flex-col gap-1">
                 {links.map((l) => (
                   <Link
                     key={l.href}

@@ -18,4 +18,6 @@ export interface HandoverReport {
   signedDoc?: string; // data URL of the signed paper handover (photo / scan)
   signedAt?: number; // epoch ms when signedDoc stored
   clothType?: string; // type of cloth (e.g. Jacket, Coat, Scarf)
+  emailSentAt?: number; // epoch ms when confirmation email sent
+  emailSentTo?: string; // email used for the confirmation message
 }

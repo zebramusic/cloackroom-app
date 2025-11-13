@@ -1,6 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESS_COOKIE } from "@/lib/auth";
 
+const defaultCorsOrigins = ["http://localhost:8081"];
+const envCorsOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedCorsOrigins = envCorsOrigins?.length
+  ? envCorsOrigins
+  : defaultCorsOrigins;
+
+const DEV_TUNNEL_SUFFIX = ".devtunnels.ms";
+
+function resolveCorsOrigin(origin: string | null): string | null {
+  if (!origin) return allowedCorsOrigins[0] ?? null;
+  if (allowedCorsOrigins.includes(origin)) return origin;
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname.endsWith(DEV_TUNNEL_SUFFIX)) {
+      return origin;
+    }
+  } catch (error) {
+    // ignore invalid origins
+  }
+  return null;
+}
+
+function applyCorsHeaders(req: NextRequest, res: NextResponse) {
+  const origin = resolveCorsOrigin(req.headers.get("origin"));
+  if (origin) {
+    res.headers.set("Access-Control-Allow-Origin", origin);
+    res.headers.set("Vary", "Origin");
+  }
+  res.headers.set("Access-Control-Allow-Credentials", "true");
+  const requestedHeaders = req.headers.get("access-control-request-headers");
+  if (requestedHeaders) {
+    res.headers.set("Access-Control-Allow-Headers", requestedHeaders);
+  } else {
+    res.headers.set(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept"
+    );
+  }
+  res.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+  );
+  return res;
+}
+
 // Paths that don't require auth inside /admin
 const adminPublic = [
   "/private/admin/login",
@@ -16,6 +63,14 @@ function isAdminPublicPath(path: string) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  if (pathname.startsWith("/api/")) {
+    if (req.method === "OPTIONS") {
+      const preflight = new NextResponse(null, { status: 204 });
+      return applyCorsHeaders(req, preflight);
+    }
+    const res = NextResponse.next();
+    return applyCorsHeaders(req, res);
+  }
   if (!pathname.startsWith("/private")) {
     return NextResponse.next();
   }
@@ -51,5 +106,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/private/:path*", "/not-allowed"],
+  matcher: ["/api/:path*", "/private/:path*", "/not-allowed"],
 };

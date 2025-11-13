@@ -17,6 +17,7 @@ export default function HandoversClient() {
     type?: "admin" | "staff";
     authorizedEventId?: string;
   } | null>(null);
+  const [emailingId, setEmailingId] = useState<string | null>(null);
 
   const fetchList = useCallback(
     async (query?: string) => {
@@ -87,6 +88,64 @@ export default function HandoversClient() {
       const message =
         e instanceof Error ? e.message : "Network error while deleting";
       push({ message, variant: "error" });
+    }
+  }
+
+  async function handleEmail(handover: HandoverReport) {
+    if (!handover.email) {
+      push({
+        message: "No client email saved for this handover.",
+        variant: "error",
+      });
+      return;
+    }
+    setEmailingId(handover.id);
+    try {
+      const res = await fetch("/api/handover/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: handover.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        recipient?: string;
+        sentAt?: number;
+      };
+      if (!res.ok) {
+        const message = data?.error || "Failed to send handover email";
+        push({ message, variant: "error" });
+        return;
+      }
+      const recipient = data?.recipient || handover.email;
+      const sentAt =
+        typeof data?.sentAt === "number" ? data.sentAt : Date.now();
+      setItems((prev) =>
+        Array.isArray(prev)
+          ? prev.map((item) =>
+              item.id === handover.id
+                ? {
+                    ...item,
+                    emailSentAt: sentAt,
+                    emailSentTo: recipient,
+                  }
+                : item
+            )
+          : prev
+      );
+      push({
+        message: recipient
+          ? `Handover emailed to ${recipient}`
+          : "Handover email sent",
+        variant: "success",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Network error while sending email";
+      push({ message, variant: "error" });
+    } finally {
+      setEmailingId(null);
     }
   }
 
@@ -203,6 +262,29 @@ export default function HandoversClient() {
                     Event: {r.eventName || r.eventId}
                   </span>
                 ) : null}
+                {r.emailSentAt ? (
+                  <span
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-500/50 bg-emerald-500/10 px-3 py-0.5 text-[10px] font-semibold text-emerald-700"
+                    title={`Email sent ${new Date(
+                      r.emailSentAt
+                    ).toLocaleString()}${
+                      r.emailSentTo ? ` to ${r.emailSentTo}` : ""
+                    }`}
+                  >
+                    <span aria-hidden="true" role="img">
+                      ✉️
+                    </span>
+                    <span className="flex items-center gap-1 whitespace-pre-wrap text-left">
+                      Email sent {new Date(r.emailSentAt).toLocaleString()}
+                      {r.emailSentTo ? (
+                        <>
+                          {" · "}
+                          {r.emailSentTo}
+                        </>
+                      ) : null}
+                    </span>
+                  </span>
+                ) : null}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -216,6 +298,20 @@ export default function HandoversClient() {
                 </Link>
                 <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
                   View details
+                </span>
+              </div>
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => void handleEmail(r)}
+                  disabled={emailingId === r.id}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label="Email handover"
+                >
+                  {emailingId === r.id ? "⌛" : "✉️"}
+                </button>
+                <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
+                  Email handover
                 </span>
               </div>
               <div className="relative group">

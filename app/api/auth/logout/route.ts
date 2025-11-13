@@ -10,8 +10,22 @@ export async function POST(req: NextRequest) {
     if (db) await db.collection("sessions").deleteOne({ token });
   }
   const res = NextResponse.json({ ok: true });
-  const secure = process.env.NODE_ENV === "production";
-  res.cookies.set(SESS_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0, secure, sameSite: "lax" });
-  res.cookies.set("cloack_role", "", { httpOnly: false, path: "/", maxAge: 0, secure, sameSite: "lax" });
+  const origin = req.headers.get("origin");
+  let sameSite: "lax" | "none" = "lax";
+  let secure = process.env.NODE_ENV === "production";
+  if (origin) {
+    try {
+      const originHost = new URL(origin).hostname;
+      const requestHost = req.nextUrl.hostname;
+      if (originHost !== requestHost) {
+        sameSite = "none";
+        secure = true;
+      }
+    } catch {
+      // ignore malformed origin headers and fall back to defaults
+    }
+  }
+  res.cookies.set(SESS_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0, secure, sameSite });
+  res.cookies.set("cloack_role", "", { httpOnly: false, path: "/", maxAge: 0, secure, sameSite });
   return res;
 }

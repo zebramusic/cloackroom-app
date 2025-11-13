@@ -5,11 +5,14 @@ import { getDb } from "@/lib/mongodb";
 import type { Event } from "@/app/models/event";
 import { isEventActive } from "@/app/models/event";
 import { getSessionUser, SESS_COOKIE } from "@/lib/auth";
+import { sendHandoverEmails } from "@/lib/email";
 
 // In-memory fallback store when no DB is available
 const store: Map<string, HandoverReport> = new Map();
+export const handoverMemoryStore = store;
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
+  const idFilter = (searchParams.get("id") || "").trim();
   const q = (searchParams.get("q") || "").trim();
   const coat = (searchParams.get("coat") || "").trim();
   const name = (searchParams.get("name") || "").trim();
@@ -73,7 +76,8 @@ export async function GET(req: NextRequest) {
         and.push({ eventId: me.authorizedEventId });
       }
     }
-    if (eventId) and.push({ eventId });
+  if (idFilter) and.push({ id: idFilter });
+  if (eventId) and.push({ eventId });
     if (eventName)
       and.push({ eventName: { $regex: eventName, $options: "i" } });
     if (coat) and.push({ coatNumber: { $regex: coat, $options: "i" } });
@@ -99,6 +103,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ items });
   }
   // In-memory fallback
+  const idLower = idFilter.toLowerCase();
   const qLower = q.toLowerCase();
   const coatL = coat.toLowerCase();
   const nameL = name.toLowerCase();
@@ -111,6 +116,7 @@ export async function GET(req: NextRequest) {
           if (!me.authorizedEventId) return false;
           if (r.eventId !== me.authorizedEventId) return false;
         }
+      if (idLower && r.id.toLowerCase() !== idLower) return false;
       if (eventId && r.eventId !== eventId) return false;
       if (
         eventName &&
@@ -149,36 +155,54 @@ export async function POST(req: NextRequest) {
   if (me.type === "staff" && me.isAuthorized === false) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const db = await getDb();
   // Staff can only create within their authorized event
   if (me.type === "staff") {
     if (!me.authorizedEventId) {
       return NextResponse.json({ error: "Not allowed: no event authorization" }, { status: 403 });
     }
-    // Ensure the authorized event is currently active
-    const db = await getDb();
-    if (db) {
-      const ev = await db.collection<Event>("events").findOne({ id: me.authorizedEventId });
-      if (ev && !isEventActive(ev, Date.now())) {
-        return NextResponse.json({ error: "Event not active" }, { status: 403 });
-      }
-    } else {
-      // Without DB, allow creation; eventId will be pinned to authorizedEventId and stored in-memory.
-    }
     if (body.eventId && body.eventId !== me.authorizedEventId) {
       return NextResponse.json({ error: "Not allowed for this event" }, { status: 403 });
     }
   }
+  const rawEventId =
+    me.type === "staff"
+      ? me.authorizedEventId
+      : body.eventId != null
+      ? String(body.eventId).trim()
+      : undefined;
+  const effectiveEventId = rawEventId && rawEventId.length ? rawEventId : undefined;
+
+  if (!effectiveEventId) {
+    return NextResponse.json(
+      { error: "An active event is required to create a handover" },
+      { status: 400 }
+    );
+  }
+
+  let eventDoc: Event | null = null;
+  if (db) {
+    eventDoc = await db.collection<Event>("events").findOne({ id: effectiveEventId });
+    if (!eventDoc) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (!isEventActive(eventDoc, Date.now())) {
+      return NextResponse.json({ error: "Event not active" }, { status: 403 });
+    }
+  }
+
+  const resolvedEventName =
+    eventDoc?.name || (body.eventName ? String(body.eventName) : undefined);
+  const createdAt =
+    typeof body.createdAt === "number" && Number.isFinite(body.createdAt)
+      ? body.createdAt
+      : Date.now();
   const report: HandoverReport = {
     id: body.id,
     coatNumber: String(body.coatNumber),
     fullName: String(body.fullName),
-    eventId:
-      me && me.type === "staff"
-        ? me.authorizedEventId
-        : body.eventId
-        ? String(body.eventId)
-        : undefined,
-    eventName: body.eventName ? String(body.eventName) : undefined,
+    eventId: effectiveEventId,
+    eventName: resolvedEventName,
     phone: body.phone ? String(body.phone) : undefined,
     phoneVerified:
       body.phone && typeof body.phoneVerified === "boolean"
@@ -200,15 +224,76 @@ export async function POST(req: NextRequest) {
     photos: Array.isArray(body.photos)
       ? body.photos.filter((p): p is string => typeof p === "string")
       : undefined,
-    createdAt: Date.now(),
+    createdAt,
+    signedDoc:
+      body.signedDoc && typeof body.signedDoc === "string"
+        ? body.signedDoc
+        : undefined,
+    signedAt:
+      body.signedAt && typeof body.signedAt === "number"
+        ? body.signedAt
+        : undefined,
+    emailSentAt:
+      body.emailSentAt && typeof body.emailSentAt === "number"
+        ? body.emailSentAt
+        : undefined,
+    emailSentTo:
+      body.emailSentTo && typeof body.emailSentTo === "string"
+        ? body.emailSentTo
+        : undefined,
   };
-  const db = await getDb();
   if (db) {
     const col = db.collection<HandoverReport>("handovers");
     await col.updateOne({ id: report.id }, { $set: report }, { upsert: true });
+    
+    // Send emails after successful handover creation (async, non-blocking)
+    setImmediate(async () => {
+      try {
+        const emailResults = await sendHandoverEmails(report);
+        console.log('Handover email results:', emailResults);
+        if (emailResults.client.success && emailResults.client.recipient) {
+          const sentAt = Date.now();
+          await col.updateOne(
+            { id: report.id },
+            {
+              $set: {
+                emailSentAt: sentAt,
+                emailSentTo: emailResults.client.recipient,
+              },
+            }
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send handover emails:', emailError);
+        // Log error but don't affect the handover creation response
+      }
+    });
+    
     return NextResponse.json(report, { status: 201 });
   }
   store.set(report.id, report);
+  
+  // Send emails for in-memory storage too (async, non-blocking)
+  setImmediate(async () => {
+    try {
+      const emailResults = await sendHandoverEmails(report);
+      console.log('Handover email results:', emailResults);
+      if (emailResults.client.success && emailResults.client.recipient) {
+        const sentAt = Date.now();
+        const existing = store.get(report.id);
+        if (existing) {
+          store.set(report.id, {
+            ...existing,
+            emailSentAt: sentAt,
+            emailSentTo: emailResults.client.recipient,
+          });
+        }
+      }
+    } catch (emailError) {
+      console.error('Failed to send handover emails:', emailError);
+    }
+  });
+  
   return NextResponse.json(report, { status: 201 });
 }
 

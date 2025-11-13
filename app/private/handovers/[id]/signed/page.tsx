@@ -32,7 +32,9 @@ export default async function SignedDocPage({ params }: Params) {
     if (!me.isAuthorized || !me.authorizedEventId) notFound();
     const db = await getDb();
     if (!db) notFound();
-    const ev = await db.collection<Event>("events").findOne({ id: me.authorizedEventId });
+    const ev = await db
+      .collection<Event>("events")
+      .findOne({ id: me.authorizedEventId });
     if (!ev || !isEventActive(ev)) notFound();
     const withinWindow =
       report.createdAt >= ev.startsAt && report.createdAt <= ev.endsAt;
@@ -44,7 +46,9 @@ export default async function SignedDocPage({ params }: Params) {
     return (
       <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6">
         <header className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold tracking-tight">Signed Handover</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Signed Handover
+          </h1>
           <Link
             href={`/private/handovers/${encodeURIComponent(report.id)}`}
             className="text-xs rounded-full border border-border px-3 py-1 hover:bg-muted"
@@ -65,7 +69,9 @@ export default async function SignedDocPage({ params }: Params) {
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Signed Handover</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Signed Handover
+          </h1>
           <p className="text-xs text-muted-foreground">Collected {created}</p>
         </div>
         <div className="flex items-center gap-2">

@@ -25,18 +25,26 @@ export async function POST(req: NextRequest) {
   const me = await getSessionUser(token);
   if (!me || me.type !== "admin")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const body = (await req.json()) as Partial<StaffUser> & { password?: string };
+  const body = (await req.json()) as Partial<StaffUser> & {
+    password?: string;
+    isAuthorized?: boolean;
+    authorizedEventId?: string | null;
+  };
   if (!body.fullName || !body.email || !body.password)
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   const db = await getDb();
   if (!db) return NextResponse.json({ error: "DB not configured" }, { status: 500 });
+  const trimmedEventId =
+    typeof body.authorizedEventId === "string" && body.authorizedEventId.trim().length > 0
+      ? body.authorizedEventId.trim()
+      : undefined;
   const user: StaffUser = {
     id: `staff_${Date.now()}`,
     fullName: body.fullName,
     email: String(body.email).toLowerCase(),
     passwordHash: await hashPassword(body.password),
-    isAuthorized: true,
-    authorizedEventId: undefined,
+    isAuthorized: body.isAuthorized ?? true,
+    authorizedEventId: trimmedEventId,
     createdAt: Date.now(),
   };
   await db.collection<StaffUser>("staff").updateOne({ id: user.id }, { $set: user }, { upsert: true });
@@ -50,7 +58,12 @@ export async function PATCH(req: NextRequest) {
   const me = await getSessionUser(token);
   if (!me || me.type !== "admin")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const body = (await req.json()) as Partial<StaffUser> & { id?: string; password?: string; isAuthorized?: boolean; authorizedEventId?: string | null };
+  const body = (await req.json()) as Partial<StaffUser> & {
+    id?: string;
+    password?: string;
+    isAuthorized?: boolean;
+    authorizedEventId?: string | null;
+  };
   if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const db = await getDb();
   if (!db) return NextResponse.json({ error: "DB not configured" }, { status: 500 });
@@ -59,7 +72,13 @@ export async function PATCH(req: NextRequest) {
   if (body.email) update.email = body.email.toLowerCase();
   if (body.password) update.passwordHash = await hashPassword(body.password);
   if (typeof body.isAuthorized === "boolean") update.isAuthorized = body.isAuthorized;
-  if (typeof body.authorizedEventId === "string") update.authorizedEventId = body.authorizedEventId || undefined;
+  if (typeof body.authorizedEventId === "string") {
+    update.authorizedEventId = body.authorizedEventId.trim().length
+      ? body.authorizedEventId.trim()
+      : undefined;
+  } else if (body.authorizedEventId === null) {
+    update.authorizedEventId = undefined;
+  }
   await db.collection<StaffUser>("staff").updateOne({ id: body.id }, { $set: update });
   const updated = await db.collection<StaffUser>("staff").findOne({ id: body.id });
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
