@@ -5,6 +5,7 @@ export default function EmailTestPage() {
   const [testEmail, setTestEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  
 
   const handleTest = async () => {
     setIsLoading(true);
