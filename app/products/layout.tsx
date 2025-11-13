@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import SiteNav from "@/app/components/SiteNav";
 
 export const metadata = { title: "Products" };
@@ -9,7 +10,9 @@ export default function ProductsLayout({
 }) {
   return (
     <div>
-      <SiteNav />
+      <Suspense fallback={null}>
+        <SiteNav />
+      </Suspense>
       {children}
     </div>
   );
