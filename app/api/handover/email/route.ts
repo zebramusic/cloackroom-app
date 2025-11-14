@@ -1,7 +1,10 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import type { HandoverReport } from "@/app/models/handover";
+import type {
+  HandoverEmailLogEntry,
+  HandoverReport,
+} from "@/app/models/handover";
 import { getSessionUser, SESS_COOKIE } from "@/lib/auth";
 import { sendHandoverClientEmail } from "@/lib/email";
 import { getDb } from "@/lib/mongodb";
@@ -83,14 +86,24 @@ export async function POST(req: NextRequest) {
   }
 
   const sentAt = Date.now();
-  const resolvedRecipient = result.recipient || overrideEmail || handover.email || "";
+  const resolvedRecipient =
+    (result.recipient || overrideEmail || handover.email || "").trim();
+  const recipientForRecord = resolvedRecipient || undefined;
+  const attempt: HandoverEmailLogEntry = {
+    sentAt,
+    success: true,
+    recipient: recipientForRecord,
+  };
 
   if (db) {
     await db
       .collection<HandoverReport>("handovers")
       .updateOne(
         { id },
-        { $set: { emailSentAt: sentAt, emailSentTo: resolvedRecipient } }
+        {
+          $push: { emailSendHistory: attempt },
+          $set: { emailSentAt: sentAt, emailSentTo: recipientForRecord },
+        }
       );
     const updated = await db
       .collection<HandoverReport>("handovers")
@@ -102,7 +115,11 @@ export async function POST(req: NextRequest) {
       const merged = {
         ...existing,
         emailSentAt: sentAt,
-        emailSentTo: resolvedRecipient,
+        emailSentTo: recipientForRecord,
+        emailSendHistory: [
+          ...(existing.emailSendHistory || []),
+          attempt,
+        ],
       };
       handoverMemoryStore.set(id, merged);
       handover = merged;
@@ -114,5 +131,6 @@ export async function POST(req: NextRequest) {
     messageId: result.messageId ?? null,
     recipient: resolvedRecipient,
     sentAt,
+    emailSendHistory: handover?.emailSendHistory || [],
   });
 }

@@ -4,6 +4,31 @@ import Link from "next/link";
 import type { HandoverReport } from "@/app/models/handover";
 import { useToast } from "@/app/private/toast/ToastContext";
 
+type EmailHistoryEntry = NonNullable<
+  HandoverReport["emailSendHistory"]
+>[number];
+
+const formatTimestamp = (value: number) => new Date(value).toLocaleString();
+
+function deriveEmailHistory(report: HandoverReport): EmailHistoryEntry[] {
+  const history = Array.isArray(report.emailSendHistory)
+    ? [...report.emailSendHistory]
+    : [];
+  if (history.length > 0) {
+    return history.sort((a, b) => a.sentAt - b.sentAt);
+  }
+  if (report.emailSentAt) {
+    return [
+      {
+        sentAt: report.emailSentAt,
+        success: true,
+        recipient: report.emailSentTo,
+      },
+    ];
+  }
+  return [];
+}
+
 export default function HandoversClient() {
   const { push } = useToast();
   const [items, setItems] = useState<HandoverReport[] | null>(null);
@@ -56,7 +81,6 @@ export default function HandoversClient() {
     void fetchList("");
   }, [fetchList]); // initial load only
 
-  // Re-run fetch when field filters change (debounced minimal by synchronous grouping)
   useEffect(() => {
     const t = setTimeout(() => void fetchList(q), 200);
     return () => clearTimeout(t);
@@ -110,15 +134,19 @@ export default function HandoversClient() {
         error?: string;
         recipient?: string;
         sentAt?: number;
+        emailSendHistory?: EmailHistoryEntry[];
       };
       if (!res.ok) {
         const message = data?.error || "Failed to send handover email";
         push({ message, variant: "error" });
         return;
       }
-      const recipient = data?.recipient || handover.email;
+      const recipient = (data?.recipient || handover.email || "").trim();
       const sentAt =
         typeof data?.sentAt === "number" ? data.sentAt : Date.now();
+      const historyFromResponse = Array.isArray(data?.emailSendHistory)
+        ? data.emailSendHistory
+        : null;
       setItems((prev) =>
         Array.isArray(prev)
           ? prev.map((item) =>
@@ -126,7 +154,18 @@ export default function HandoversClient() {
                 ? {
                     ...item,
                     emailSentAt: sentAt,
-                    emailSentTo: recipient,
+                    emailSentTo: recipient || undefined,
+                    emailSendHistory:
+                      historyFromResponse && historyFromResponse.length
+                        ? historyFromResponse
+                        : [
+                            ...deriveEmailHistory(item),
+                            {
+                              sentAt,
+                              success: true,
+                              recipient: recipient || undefined,
+                            },
+                          ],
                   }
                 : item
             )
@@ -241,125 +280,166 @@ export default function HandoversClient() {
             No handovers found.
           </div>
         ) : null}
-        {items?.map((r) => (
-          <div
-            key={r.id}
-            className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">
-                #{r.coatNumber} — {r.fullName}
-              </div>
-              <div className="mt-0.5 text-xs text-muted-foreground flex flex-wrap gap-3 items-center">
-                <span>{new Date(r.createdAt).toLocaleString()}</span>
-                {r.staff ? <span>Staff: {r.staff}</span> : null}
-                {r.phone ? <span>Tel: {r.phone}</span> : null}
-                {r.language ? (
-                  <span>Lang: {r.language.toUpperCase()}</span>
-                ) : null}
-                {r.eventName || r.eventId ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] leading-none bg-muted">
-                    Event: {r.eventName || r.eventId}
-                  </span>
-                ) : null}
-                {r.emailSentAt ? (
+        {items?.map((r) => {
+          const emailHistory = deriveEmailHistory(r);
+          const successfulEmails = emailHistory.filter(
+            (entry) => entry.success
+          );
+          const successCount = successfulEmails.length;
+          const successTimes = successfulEmails.map((entry) =>
+            formatTimestamp(entry.sentAt)
+          );
+          const lastAttempt = emailHistory[emailHistory.length - 1];
+          const emailTooltip =
+            emailHistory.length > 0
+              ? emailHistory
+                  .map((entry) => {
+                    const prefix = entry.success ? "✅" : "⚠️";
+                    const time = formatTimestamp(entry.sentAt);
+                    const recipientLabel = entry.recipient
+                      ? ` → ${entry.recipient}`
+                      : "";
+                    const errorLabel =
+                      !entry.success && entry.error ? ` – ${entry.error}` : "";
+                    return `${prefix} ${time}${recipientLabel}${errorLabel}`;
+                  })
+                  .join("\n")
+              : undefined;
+          let emailStatusText: string;
+          let emailBadgeTone = "border-border bg-muted text-muted-foreground";
+          let emailIcon = "📬";
+          if (!r.email) {
+            emailStatusText = "Client email not provided";
+            emailIcon = "🚫";
+          } else if (successCount > 0) {
+            const timesText = successTimes.join("; ");
+            emailStatusText = `Sent ${successCount} ${
+              successCount === 1 ? "time" : "times"
+            } on ${timesText}`;
+            emailBadgeTone =
+              "border-emerald-500/50 bg-emerald-500/10 text-emerald-700";
+            emailIcon = "✉️";
+          } else if (lastAttempt) {
+            const failureTime = formatTimestamp(lastAttempt.sentAt);
+            const reason = lastAttempt.error ? ` – ${lastAttempt.error}` : "";
+            emailStatusText = `Last attempt failed at ${failureTime}${reason}`;
+            emailBadgeTone =
+              "border-amber-500/50 bg-amber-500/10 text-amber-700";
+            emailIcon = "⚠️";
+          } else {
+            emailStatusText = "Email not sent yet";
+            emailIcon = "📬";
+          }
+          const emailBadgeClassName = `inline-flex items-center gap-2 rounded-full border px-3 py-0.5 text-[10px] font-semibold ${emailBadgeTone}`;
+
+          return (
+            <div
+              key={r.id}
+              className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">
+                  #{r.coatNumber} — {r.fullName}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground flex flex-wrap gap-3 items-center">
+                  <span>Issued: {formatTimestamp(r.createdAt)}</span>
+                  {r.staff ? <span>Staff: {r.staff}</span> : null}
+                  {r.phone ? <span>Tel: {r.phone}</span> : null}
+                  {r.language ? (
+                    <span>Lang: {r.language.toUpperCase()}</span>
+                  ) : null}
+                  {r.eventName || r.eventId ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] leading-none bg-muted">
+                      Event: {r.eventName || r.eventId}
+                    </span>
+                  ) : null}
                   <span
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-500/50 bg-emerald-500/10 px-3 py-0.5 text-[10px] font-semibold text-emerald-700"
-                    title={`Email sent ${new Date(
-                      r.emailSentAt
-                    ).toLocaleString()}${
-                      r.emailSentTo ? ` to ${r.emailSentTo}` : ""
-                    }`}
+                    className={emailBadgeClassName}
+                    title={emailTooltip || undefined}
                   >
                     <span aria-hidden="true" role="img">
-                      ✉️
+                      {emailIcon}
                     </span>
                     <span className="flex items-center gap-1 whitespace-pre-wrap text-left">
-                      Email sent {new Date(r.emailSentAt).toLocaleString()}
-                      {r.emailSentTo ? (
-                        <>
-                          {" · "}
-                          {r.emailSentTo}
-                        </>
-                      ) : null}
+                      {emailStatusText}
                     </span>
                   </span>
-                ) : null}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative group">
-                <Link
-                  href={`/private/handovers/${encodeURIComponent(r.id)}`}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted"
-                  aria-label="View details"
-                >
-                  🔍
-                </Link>
-                <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
-                  View details
-                </span>
-              </div>
-              <div className="relative group">
-                <button
-                  type="button"
-                  onClick={() => void handleEmail(r)}
-                  disabled={emailingId === r.id}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-label="Email handover"
-                >
-                  {emailingId === r.id ? "⌛" : "✉️"}
-                </button>
-                <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
-                  Email handover
-                </span>
-              </div>
-              <div className="relative group">
-                <Link
-                  href={`/private/handover/print/${encodeURIComponent(
-                    r.id
-                  )}?lang=${r.language || "ro"}`}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted"
-                  aria-label="Print handover"
-                >
-                  🖨️
-                </Link>
-                <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
-                  Print handover
-                </span>
-              </div>
-              <div className="relative group">
-                <Link
-                  href={`/private/handover/print/${encodeURIComponent(
-                    r.id
-                  )}?open=pdf&auto=1&lang=${r.language || "ro"}`}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted"
-                  aria-label="Download PDF"
-                >
-                  ⬇️
-                </Link>
-                <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
-                  Download PDF
-                </span>
-              </div>
-              {isAdmin ? (
+              <div className="flex items-center gap-2">
+                <div className="relative group">
+                  <Link
+                    href={`/private/handovers/${encodeURIComponent(r.id)}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted"
+                    aria-label="View details"
+                  >
+                    🔍
+                  </Link>
+                  <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
+                    View details
+                  </span>
+                </div>
                 <div className="relative group">
                   <button
                     type="button"
-                    onClick={() => void handleDelete(r.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] text-red-600 hover:bg-red-500/10"
-                    aria-label="Delete handover"
+                    onClick={() => void handleEmail(r)}
+                    disabled={emailingId === r.id}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Email handover"
                   >
-                    🗑️
+                    {emailingId === r.id ? "⌛" : "✉️"}
                   </button>
                   <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
-                    Delete handover
+                    Email handover
                   </span>
                 </div>
-              ) : null}
+                <div className="relative group">
+                  <Link
+                    href={`/private/handover/print/${encodeURIComponent(
+                      r.id
+                    )}?lang=${r.language || "ro"}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted"
+                    aria-label="Print handover"
+                  >
+                    🖨️
+                  </Link>
+                  <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
+                    Print handover
+                  </span>
+                </div>
+                <div className="relative group">
+                  <Link
+                    href={`/private/handover/print/${encodeURIComponent(
+                      r.id
+                    )}?open=pdf&auto=1&lang=${r.language || "ro"}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] hover:bg-muted"
+                    aria-label="Download PDF"
+                  >
+                    ⬇️
+                  </Link>
+                  <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
+                    Download PDF
+                  </span>
+                </div>
+                {isAdmin ? (
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(r.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-[13px] text-red-600 hover:bg-red-500/10"
+                      aria-label="Delete handover"
+                    >
+                      🗑️
+                    </button>
+                    <span className="pointer-events-none absolute -top-9 left-1/2 w-max -translate-x-1/2 scale-95 rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-sm transition group-hover:scale-100 group-hover:opacity-100">
+                      Delete handover
+                    </span>
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </main>
   );

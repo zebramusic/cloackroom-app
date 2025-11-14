@@ -69,7 +69,11 @@ export default function HandoverClient() {
     type?: string;
     authorizedEventId?: string;
   } | null>(null);
-  const { data: events, error: eventsError } = useEvents({
+  const {
+    data: events,
+    error: eventsError,
+    isLoading: eventsLoading,
+  } = useEvents({
     refreshInterval: 60000,
   });
   const activeEvents = useMemo(() => {
@@ -312,10 +316,30 @@ export default function HandoverClient() {
     push({ message, variant: "error" });
   }, [eventsError, push]);
 
+  const staffEventWarningRef = useRef(false);
+
   useEffect(() => {
+    if (eventsLoading) return;
+    const now = Date.now();
     if (me?.type === "staff" && me.authorizedEventId) {
-      const targetId = me.authorizedEventId ?? null;
-      setSelectedEventId((prev) => (prev === targetId ? prev : targetId));
+      const authorizedEvent = events.find(
+        (event) => event.id === me.authorizedEventId
+      );
+      if (authorizedEvent && isEventActive(authorizedEvent, now)) {
+        staffEventWarningRef.current = false;
+        setSelectedEventId((prev) =>
+          prev === authorizedEvent.id ? prev : authorizedEvent.id
+        );
+        return;
+      }
+      setSelectedEventId((prev) => (prev === null ? prev : null));
+      if (!staffEventWarningRef.current) {
+        const message = authorizedEvent
+          ? `The event "${authorizedEvent.name}" is no longer active. Ask an admin to assign an active event before issuing handovers.`
+          : "Your assigned event is no longer available. Ask an admin to assign an active event before issuing handovers.";
+        push({ message, variant: "error" });
+        staffEventWarningRef.current = true;
+      }
       return;
     }
     if (activeEvents.length === 1) {
@@ -332,7 +356,14 @@ export default function HandoverClient() {
     setSelectedEventId((prev) =>
       prev && events.some((event) => event.id === prev) ? prev : null
     );
-  }, [activeEvents, events, me?.authorizedEventId, me?.type]);
+  }, [
+    activeEvents,
+    events,
+    eventsLoading,
+    me?.authorizedEventId,
+    me?.type,
+    push,
+  ]);
 
   // Re-start camera when device changes
   useEffect(() => {
@@ -349,11 +380,38 @@ export default function HandoverClient() {
   }, [selectedDeviceId, cameraOpen, startCamera]);
 
   async function submit() {
+    if (eventsLoading) {
+      push({
+        message:
+          "Events are still loading. Please wait a moment and try again.",
+        variant: "error",
+      });
+      return;
+    }
     if (!selectedEventId) {
       push({
         message: "Select an active event before saving a handover.",
         variant: "error",
       });
+      return;
+    }
+    const eventRecord =
+      events.find((event) => event.id === selectedEventId) || null;
+    if (!eventRecord) {
+      push({
+        message:
+          "Selected event no longer exists. Refresh the page and try again.",
+        variant: "error",
+      });
+      setSelectedEventId(null);
+      return;
+    }
+    if (!isEventActive(eventRecord, Date.now())) {
+      push({
+        message: `The event "${eventRecord.name}" is no longer active. Activate a current event before issuing handovers.`,
+        variant: "error",
+      });
+      setSelectedEventId(null);
       return;
     }
     if (!coatNumber.trim() || !fullName.trim()) return;
@@ -367,9 +425,7 @@ export default function HandoverClient() {
         coatNumber: coatNumber.trim(),
         fullName: fullName.trim(),
         eventId: selectedEventId!,
-        eventName: selectedEventId
-          ? events.find((e) => e.id === selectedEventId)?.name
-          : undefined,
+        eventName: eventRecord?.name,
         phone: phone.trim() || undefined,
         phoneVerified: phone.trim() ? phoneVerified : undefined,
         phoneVerifiedAt: phoneVerifiedAt || undefined,

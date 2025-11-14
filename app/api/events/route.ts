@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Event } from "@/app/models/event";
 import { getDb } from "@/lib/mongodb";
 import { getSessionUser, SESS_COOKIE } from "@/lib/auth";
-
-// Fallback in-memory store when MongoDB not configured
-const memEvents: Event[] = [];
-
-function sortEvents(list: Event[]) {
-  list.sort((a, b) => a.startsAt - b.startsAt);
-}
+import {
+  listMemoryEvents,
+  removeMemoryEvent,
+  updateMemoryEvent,
+  upsertMemoryEvent,
+} from "@/app/api/events/memoryStore";
 
 export async function GET() {
   try {
@@ -24,8 +23,8 @@ export async function GET() {
         headers: { "content-type": "application/json" },
       });
     }
-    sortEvents(memEvents);
-    return new Response(JSON.stringify({ items: memEvents }), {
+    const items = listMemoryEvents();
+    return new Response(JSON.stringify({ items }), {
       headers: { "content-type": "application/json" },
     });
   } catch (e) {
@@ -78,8 +77,7 @@ export async function POST(req: NextRequest) {
       await col.updateOne({ id: ev.id }, { $set: ev }, { upsert: true });
       return NextResponse.json(ev, { status: 201 });
     }
-    memEvents.push(ev);
-    sortEvents(memEvents);
+    upsertMemoryEvent(ev);
     return NextResponse.json(ev, { status: 201 });
   } catch (e) {
     console.error(e);
@@ -130,13 +128,13 @@ export async function PATCH(req: NextRequest) {
       if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
       return NextResponse.json(doc);
     }
-    const idx = memEvents.findIndex((e) => e.id === id);
-    if (idx === -1)
+    const updated = updateMemoryEvent(id, (prev) => ({
+      ...prev,
+      ...update,
+    } as Event));
+    if (!updated)
       return NextResponse.json({ error: "Not found" }, { status: 404 });
-    const merged = { ...memEvents[idx], ...update } as Event;
-    memEvents[idx] = merged;
-    sortEvents(memEvents);
-    return NextResponse.json(merged);
+    return NextResponse.json(updated);
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Failed to update event" }, { status: 500 });
@@ -162,8 +160,7 @@ export async function DELETE(req: NextRequest) {
       await col.deleteOne({ id });
       return NextResponse.json({ ok: true });
     }
-    const idx = memEvents.findIndex((e) => e.id === id);
-    if (idx !== -1) memEvents.splice(idx, 1);
+    removeMemoryEvent(id);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);

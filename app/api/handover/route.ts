@@ -1,15 +1,43 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
-import type { HandoverReport } from "@/app/models/handover";
+import type {
+  HandoverEmailLogEntry,
+  HandoverReport,
+} from "@/app/models/handover";
 import { getDb } from "@/lib/mongodb";
 import type { Event } from "@/app/models/event";
 import { isEventActive } from "@/app/models/event";
 import { getSessionUser, SESS_COOKIE } from "@/lib/auth";
 import { sendHandoverEmails } from "@/lib/email";
+import { findMemoryEvent } from "@/app/api/events/memoryStore";
 
 // In-memory fallback store when no DB is available
 const store: Map<string, HandoverReport> = new Map();
 export const handoverMemoryStore = store;
+
+function normalizeEmailHistory(input: unknown): HandoverEmailLogEntry[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((entry): entry is Partial<HandoverEmailLogEntry> =>
+      entry != null &&
+      typeof entry === "object" &&
+      typeof (entry as { sentAt?: unknown }).sentAt === "number" &&
+      typeof (entry as { success?: unknown }).success === "boolean"
+    )
+    .map((entry) => ({
+      sentAt: entry.sentAt!,
+      success: entry.success!,
+      recipient:
+        typeof entry.recipient === "string" && entry.recipient.trim().length
+          ? entry.recipient.trim()
+          : undefined,
+      error:
+        typeof entry.error === "string" && entry.error.trim().length
+          ? entry.error.trim()
+          : undefined,
+    }))
+    .sort((a, b) => a.sentAt - b.sentAt);
+}
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const idFilter = (searchParams.get("id") || "").trim();
@@ -189,6 +217,15 @@ export async function POST(req: NextRequest) {
     if (!isEventActive(eventDoc, Date.now())) {
       return NextResponse.json({ error: "Event not active" }, { status: 403 });
     }
+  } else {
+    const fallbackEvent = findMemoryEvent(effectiveEventId) || null;
+    if (!fallbackEvent) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (!isEventActive(fallbackEvent, Date.now())) {
+      return NextResponse.json({ error: "Event not active" }, { status: 403 });
+    }
+    eventDoc = fallbackEvent;
   }
 
   const resolvedEventName =
@@ -197,6 +234,7 @@ export async function POST(req: NextRequest) {
     typeof body.createdAt === "number" && Number.isFinite(body.createdAt)
       ? body.createdAt
       : Date.now();
+  const initialEmailHistory = normalizeEmailHistory(body.emailSendHistory);
   const report: HandoverReport = {
     id: body.id,
     coatNumber: String(body.coatNumber),
@@ -241,30 +279,48 @@ export async function POST(req: NextRequest) {
       body.emailSentTo && typeof body.emailSentTo === "string"
         ? body.emailSentTo
         : undefined,
+    emailSendHistory: initialEmailHistory,
   };
   if (db) {
     const col = db.collection<HandoverReport>("handovers");
     await col.updateOne({ id: report.id }, { $set: report }, { upsert: true });
-    
+
     // Send emails after successful handover creation (async, non-blocking)
     setImmediate(async () => {
       try {
         const emailResults = await sendHandoverEmails(report);
-        console.log('Handover email results:', emailResults);
-        if (emailResults.client.success && emailResults.client.recipient) {
-          const sentAt = Date.now();
+        console.log("Handover email results:", emailResults);
+        const sentAt = Date.now();
+        const attempt: HandoverEmailLogEntry = {
+          sentAt,
+          success: Boolean(emailResults.client.success),
+          recipient:
+            emailResults.client.recipient?.trim() || report.email || undefined,
+          error: emailResults.client.success
+            ? undefined
+            : emailResults.client.error || "Email send failed",
+        };
+        if (attempt.success) {
           await col.updateOne(
             { id: report.id },
             {
+              $push: { emailSendHistory: attempt },
               $set: {
                 emailSentAt: sentAt,
-                emailSentTo: emailResults.client.recipient,
+                emailSentTo: attempt.recipient,
               },
+            }
+          );
+        } else {
+          await col.updateOne(
+            { id: report.id },
+            {
+              $push: { emailSendHistory: attempt },
             }
           );
         }
       } catch (emailError) {
-        console.error('Failed to send handover emails:', emailError);
+        console.error("Failed to send handover emails:", emailError);
         // Log error but don't affect the handover creation response
       }
     });
@@ -272,25 +328,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(report, { status: 201 });
   }
   store.set(report.id, report);
-  
+
   // Send emails for in-memory storage too (async, non-blocking)
   setImmediate(async () => {
     try {
       const emailResults = await sendHandoverEmails(report);
-      console.log('Handover email results:', emailResults);
-      if (emailResults.client.success && emailResults.client.recipient) {
-        const sentAt = Date.now();
-        const existing = store.get(report.id);
-        if (existing) {
-          store.set(report.id, {
-            ...existing,
-            emailSentAt: sentAt,
-            emailSentTo: emailResults.client.recipient,
-          });
-        }
-      }
+      console.log("Handover email results:", emailResults);
+      const sentAt = Date.now();
+      const attempt: HandoverEmailLogEntry = {
+        sentAt,
+        success: Boolean(emailResults.client.success),
+        recipient:
+          emailResults.client.recipient?.trim() || report.email || undefined,
+        error: emailResults.client.success
+          ? undefined
+          : emailResults.client.error || "Email send failed",
+      };
+      const existing = store.get(report.id);
+      if (!existing) return;
+      const nextHistory = [
+        ...(existing.emailSendHistory || []),
+        attempt,
+      ];
+      store.set(report.id, {
+        ...existing,
+        emailSendHistory: nextHistory,
+        ...(attempt.success
+          ? { emailSentAt: sentAt, emailSentTo: attempt.recipient }
+          : {}),
+      });
     } catch (emailError) {
-      console.error('Failed to send handover emails:', emailError);
+      console.error("Failed to send handover emails:", emailError);
     }
   });
   

@@ -1,3 +1,10 @@
+export interface HandoverEmailLogEntry {
+  sentAt: number; // epoch ms when the attempt happened
+  success: boolean; // whether the email send resolved successfully
+  recipient?: string; // email target used for the attempt
+  error?: string; // error message when success is false
+}
+
 export interface HandoverReport {
   id: string; // handover_<timestamp>
   coatNumber: string; // the coat tag/number
@@ -20,4 +27,5 @@ export interface HandoverReport {
   clothType?: string; // type of cloth (e.g. Jacket, Coat, Scarf)
   emailSentAt?: number; // epoch ms when confirmation email sent
   emailSentTo?: string; // email used for the confirmation message
+  emailSendHistory?: HandoverEmailLogEntry[]; // chronological email attempts
 }
